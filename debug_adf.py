@@ -1,0 +1,24 @@
+import os, requests, json
+from dotenv import load_dotenv
+from requests.auth import HTTPBasicAuth
+
+load_dotenv('backend/.env')
+url = os.getenv('JIRA_URL', '').split('.net')[0] + '.net'
+email = os.getenv('JIRA_EMAIL')
+token = os.getenv('JIRA_API_TOKEN')
+auth = HTTPBasicAuth(email, token)
+headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+
+def debug_issue(key):
+    resp = requests.get(f"{url}/rest/api/3/issue/{key}", headers=headers, auth=auth)
+    if resp.status_code == 200:
+        data = resp.json()
+        desc = data.get('fields', {}).get('description')
+        print(f"ISSUE: {key}")
+        print("RAW ADF DESCRIPTION:")
+        print(json.dumps(desc, indent=2))
+    else:
+        print(f"ERROR: {resp.status_code} - {resp.text}")
+
+if __name__ == "__main__":
+    debug_issue("TDECOM-8995")
