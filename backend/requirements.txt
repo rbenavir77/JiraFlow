@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+jira
+openai
+python-dotenv
+pydantic
+requests
+icalendar
+python-dateutil

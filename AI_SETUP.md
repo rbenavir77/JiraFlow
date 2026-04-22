@@ -125,4 +125,3 @@ ollama run llama3.2
 ### Error de conexión a Ollama
 - Verifica que Ollama esté corriendo: `ollama serve`
 - Ollama escucha en `http://localhost:11434` por defecto
-
