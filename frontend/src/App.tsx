@@ -13,7 +13,8 @@ import {
   Download,
   MessageSquare,
   Copy,
-  Archive
+  Archive,
+  RefreshCcw
 } from 'lucide-react';
 import './index.css';
 
@@ -40,6 +41,7 @@ function App() {
 
   const [totalHours, setTotalHours] = useState<number>(0);
   const [isSendingToJira, setIsSendingToJira] = useState(false);
+  const [isRefreshingCalendar, setIsRefreshingCalendar] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'jira') fetchTasks();
@@ -71,6 +73,7 @@ function App() {
   };
 
   const fetchMeetings = async () => {
+    setIsRefreshingCalendar(true);
     try {
       const res = await axios.get(`${API_BASE}/calendar/events`);
       if (res.data && res.data.events) {
@@ -83,6 +86,7 @@ function App() {
     } catch (e) {
       showNotification("No se pudieron cargar los eventos del calendario.", 'error');
     }
+    setIsRefreshingCalendar(false);
   };
 
   const createSubtasks = async (parentKey: string) => {
@@ -194,11 +198,11 @@ function App() {
     const offset = now.getTimezoneOffset();
     const localDate = new Date(now.getTime() - (offset * 60 * 1000));
     const today = localDate.toISOString().split('T')[0];
-    
+
     const hours = meetings
       .filter(m => m.start.dateTime.startsWith(today))
       .reduce((acc, m) => acc + (m.duration_hours || 0), 0);
-    
+
     setTotalHours(Math.round(hours * 100) / 100);
     showNotification(`Total de horas para hoy: ${hours}h`);
   };
@@ -206,7 +210,7 @@ function App() {
   const sendMeetingsToJira = async () => {
     // Buscar la primera tarea en curso
     const inProgressTask = tasks.find(t => t.status.toLowerCase().includes('en curso') || t.status.toLowerCase().includes('progress'));
-    
+
     if (!inProgressTask) {
       showNotification("No se encontró ninguna tarea 'En curso' para vincular las reuniones.", 'error');
       return;
@@ -292,10 +296,10 @@ function App() {
         </div>
         <nav style={{ display: 'flex', gap: '1rem' }}>
           <button className={activeTab === 'jira' ? '' : 'secondary'} onClick={() => setActiveTab('jira')}>
-            <LayoutDashboard size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Dashboard
+            <LayoutDashboard size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Asignaciones
           </button>
           <button className={activeTab === 'ai' ? '' : 'secondary'} onClick={() => setActiveTab('ai')}>
-            <BrainCircuit size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Copilot AI
+            <BrainCircuit size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Refinador AI
           </button>
           <button className={activeTab === 'archive' ? '' : 'secondary'} onClick={() => setActiveTab('archive')}>
             <Archive size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Historial
@@ -478,7 +482,11 @@ function App() {
                 </p>
               </div>
               <div>
-                <button onClick={sumTodayHours} className="secondary">
+                <button onClick={fetchMeetings} className="secondary" disabled={isRefreshingCalendar} title="Sincronizar calendario ahora">
+                  {isRefreshingCalendar ? <Loader2 size={16} className="spin" /> : <RefreshCcw size={16} style={{ marginRight: '6px' }} />}
+                  Actualizar
+                </button>
+                <button onClick={sumTodayHours} className="secondary" style={{ marginLeft: '0.5rem' }}>
                   <ClipboardCheck size={16} style={{ marginRight: '6px' }} /> Calcular Horas Hoy
                 </button>
                 <button onClick={sendMeetingsToJira} disabled={isSendingToJira || totalHours <= 0} style={{ marginLeft: '0.5rem' }}>
@@ -505,7 +513,7 @@ function App() {
                   <div>
                     <strong>{event.summary}</strong>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                      {new Date(event.start.dateTime || event.start.date).toLocaleString('es-CL')} 
+                      {new Date(event.start.dateTime || event.start.date).toLocaleString('es-CL')}
                       <span style={{ marginLeft: '10px', color: 'var(--accent-color)' }}>
                         ({event.duration_hours}h)
                       </span>

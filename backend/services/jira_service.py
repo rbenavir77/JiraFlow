@@ -314,6 +314,17 @@ class JiraService:
         if not self.auth:
             return {"error": "Jira client not initialized"}
 
+        # Formatear a "Xh Ym" para máxima claridad en Jira
+        h = int(hours)
+        m = int(round((hours - h) * 60))
+        
+        if h > 0 and m > 0:
+            time_str = f"{h}h {m}m"
+        elif h > 0:
+            time_str = f"{h}h"
+        else:
+            time_str = f"{m}m"
+
         payload = {
             "fields": {
                 "project": {"key": self.project_key},
@@ -321,12 +332,13 @@ class JiraService:
                 "description": {
                     "type": "doc",
                     "version": 1,
-                    "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Seguimiento de reuniones para el día {date_str}"}]}]
+                    "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Seguimiento de reuniones para el día {date_str}. Total calculado: {hours}h ({time_str})"}]}]
                 },
                 "issuetype": {"name": "Subtarea"},
                 "parent": {"key": parent_key},
                 "timetracking": {
-                    "originalEstimate": f"{hours}h"
+                    "originalEstimate": time_str,
+                    "remainingEstimate": time_str
                 }
             }
         }
