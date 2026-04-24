@@ -314,16 +314,14 @@ class JiraService:
         if not self.auth:
             return {"error": "Jira client not initialized"}
 
-        # Formatear a "Xh Ym" para máxima claridad en Jira
-        h = int(hours)
-        m = int(round((hours - h) * 60))
+        # Formatear a minutos totales para evitar problemas de interpretación con puntos/comas decimales
+        total_minutes = int(round(hours * 60))
+        time_str = f"{total_minutes}m"
         
-        if h > 0 and m > 0:
-            time_str = f"{h}h {m}m"
-        elif h > 0:
-            time_str = f"{h}h"
-        else:
-            time_str = f"{m}m"
+        # Para la descripción legible
+        h_desc = total_minutes // 60
+        m_desc = total_minutes % 60
+        readable_time = f"{h_desc}h {m_desc}m" if h_desc > 0 and m_desc > 0 else (f"{h_desc}h" if h_desc > 0 else f"{m_desc}m")
 
         payload = {
             "fields": {
@@ -332,7 +330,16 @@ class JiraService:
                 "description": {
                     "type": "doc",
                     "version": 1,
-                    "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Seguimiento de reuniones para el día {date_str}. Total calculado: {hours}h ({time_str})"}]}]
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {"type": "text", "text": f"Seguimiento de reuniones para el día {date_str}. "},
+                                {"type": "text", "text": f"Total calculado: {readable_time}. ", "marks": [{"type": "strong"}]},
+                                {"type": "text", "text": f"(DEBUG: RAW_VALUE={hours}h | {time_str})", "marks": [{"type": "em"}]}
+                            ]
+                        }
+                    ]
                 },
                 "issuetype": {"name": "Subtarea"},
                 "parent": {"key": parent_key},
