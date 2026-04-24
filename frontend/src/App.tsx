@@ -447,11 +447,27 @@ function App() {
           </div>
 
           <div className="glass-panel card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3><ClipboardCheck size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Casos de Prueba Generados</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: 0, whiteSpace: 'nowrap' }}>
+                  <ClipboardCheck size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+                  Casos de Prueba
+                </h3>
+                {testCases && (
+                  <span className="badge" style={{ background: 'rgba(88, 166, 255, 0.15)', color: 'var(--accent-color)', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid rgba(88, 166, 255, 0.3)' }}>
+                    {(() => {
+                      const match = testCases.match(/```(?:csv)?\n([\s\S]*?)\n```/);
+                      const csv = match ? match[1] : testCases.replace(/```csv/g, '').replace(/```/g, '').trim();
+                      const count = csv.split('\n').filter(line => line.trim() && line.split(';').length >= 10).length;
+                      const hasHeader = csv.includes('NOMBRE CASO PRUEBA');
+                      return hasHeader ? count - 1 : count;
+                    })()} totales
+                  </span>
+                )}
+              </div>
               {testCases && (
-                <button onClick={exportToCSV} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                  <Download size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Exportar CSV a X-ray
+                <button onClick={exportToCSV} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                  <Download size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Exportar CSV
                 </button>
               )}
             </div>
