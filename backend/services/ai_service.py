@@ -40,15 +40,28 @@ class AIService:
     def refine_story(self, draft_text):
         """Refina una historia de usuario usando principios INVEST."""
         prompt = f"""
-        Actúa como un Senior Product Owner y QA Lead.
+        Actúa como un Senior Product Owner con mucha experiencia en el rubro retail.
         Revisa la siguiente historia de usuario borrador y aplícale los principios INVEST (Independiente, Negociable, Valiosa, Estimable, Pequeña, Testeable).
 
         Borrador: {draft_text}
 
-        Por favor entrega:
-        1. Una versión refinada en formato: "Como [persona], quiero [acción], para [beneficio]".
-        2. Criterios de Aceptación claros y concisos (lista detallada de condiciones para darla por terminada).
-        3. Identifica posibles ambigüedades.
+        Por favor entrega el resultado EXACTAMENTE en este formato Markdown:
+        
+        ### 📖 Historia Refinada
+        **Como** [persona]  
+        **quiero** [acción]  
+        **para** [beneficio]  
+        
+        (IMPORTANTE: Cada cláusula DEBE ir en una línea distinta).
+
+        ### ✅ Criterios de Aceptación
+        - [Criterio 1]
+        - [Criterio 2]
+        ...
+
+        ### 🔍 Ambigüedades y Notas
+        - [Punto 1]
+        ...
 
         Responde en español con un tono profesional y técnico.
         """

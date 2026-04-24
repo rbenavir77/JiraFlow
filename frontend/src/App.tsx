@@ -282,6 +282,54 @@ function App() {
     ) : <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{testCases}</pre>;
   };
 
+  const renderRefinedStory = () => {
+    if (!refinedStory) return null;
+
+    // Intentar separar por los headers ### definidos en el prompt
+    const sections = refinedStory.split(/### /);
+    
+    if (sections.length <= 1) {
+      return <div className="result-box">{refinedStory}</div>;
+    }
+
+    const elements = [];
+    for (let i = 1; i < sections.length; i++) {
+      const section = sections[i].trim();
+      if (!section) continue;
+
+      const lines = section.split('\n');
+      const title = lines[0].trim();
+      const content = lines.slice(1).join('\n').trim();
+
+      elements.push(
+        <div key={i} style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontWeight: 'bold', color: 'var(--accent-color)', marginBottom: '10px', fontSize: '0.95rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            {title}
+          </div>
+          <div 
+            style={{ 
+              background: 'rgba(255,255,255,0.03)', 
+              padding: '1.2rem', 
+              borderRadius: '8px', 
+              border: '1px solid var(--border-color)', 
+              fontSize: '0.95rem', 
+              lineHeight: '1.6', 
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)',
+              whiteSpace: 'pre-wrap'
+            }}
+            dangerouslySetInnerHTML={{ 
+              __html: content
+                .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--accent-color)">$1</strong>')
+                .replace(/^- (.*)/gm, '<div style="display: flex; gap: 8px; margin-bottom: 4px;"><span>•</span><span>$1</span></div>')
+            }}
+          />
+        </div>
+      );
+    }
+
+    return <div>{elements}</div>;
+  };
+
   return (
     <div className="container">
       {notification && (
@@ -439,9 +487,8 @@ function App() {
             </div>
 
             {refinedStory && (
-              <div style={{ marginTop: '2rem' }}>
-                <h4 style={{ marginBottom: '0.5rem', color: 'var(--accent-color)' }}>✅ Historia Refinada</h4>
-                <div className="result-box">{refinedStory}</div>
+              <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
+                {renderRefinedStory()}
               </div>
             )}
           </div>
