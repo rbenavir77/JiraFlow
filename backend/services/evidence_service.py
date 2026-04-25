@@ -12,15 +12,12 @@ import shutil
 
 class EvidenceService:
     def __init__(self, template_path=None):
-        # Intentar detectar la ruta correcta incluso si tiene doble extensión .docx.docx
-        base_path = os.path.abspath(os.path.join("backend", "templates", "template_evidencia.docx"))
-        if os.path.exists(base_path + ".docx"):
-            self.template_path = base_path + ".docx"
-        else:
-            self.template_path = base_path
+        # Apuntar directamente al archivo con extensión simple
+        self.template_path = os.path.abspath(os.path.join("backend", "templates", "template_evidencia.docx"))
+        
         print(f"[EvidenceService] Plantilla configurada en: {self.template_path}")
         if not os.path.exists(self.template_path):
-            print(f"[EvidenceService] ADVERTENCIA: No se encontró la plantilla en esa ruta.")
+            print(f"[EvidenceService] ADVERTENCIA: No se encontró la plantilla 'template_evidencia.docx'.")
 
     def pick_directory(self):
         """Abre un diálogo nativo de Windows para seleccionar una carpeta."""
