@@ -4,6 +4,7 @@ from typing import List, Optional
 from services.jira_service import JiraService
 from services.ai_service import AIService
 from services.calendar_service import CalendarService
+from services.evidence_service import EvidenceService
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="JiraFlow QA Assistant API")
@@ -19,6 +20,7 @@ app.add_middleware(
 jira_svc = JiraService()
 ai_svc = AIService()
 cal_svc = CalendarService()
+evidence_svc = EvidenceService()
 
 class DraftStory(BaseModel):
     text: str
@@ -30,6 +32,9 @@ class MeetingSubtaskRequest(BaseModel):
     parent_key: str
     date: str
     hours: float
+
+class EvidenceRequest(BaseModel):
+    directory_path: str
 
 @app.get("/")
 def read_root():
@@ -95,6 +100,22 @@ def generate_daily(story: DraftStory):
 def get_events():
     events = cal_svc.list_upcoming_events()
     return events
+
+# --- EVIDENCE ENDPOINTS ---
+
+@app.post("/evidence/generate")
+def generate_evidence(req: EvidenceRequest):
+    try:
+        output_path = evidence_svc.generate_report(req.directory_path)
+        return {"status": "success", "output_path": output_path}
+    except Exception as e:
+        # Devolver el mensaje de error directamente para que el front lo muestre
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/evidence/pick-dir")
+def pick_directory():
+    path = evidence_svc.pick_directory()
+    return {"path": path}
 
 if __name__ == "__main__":
     import uvicorn

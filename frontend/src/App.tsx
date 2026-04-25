@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
+  FileText,
   LayoutDashboard,
   BrainCircuit,
   Calendar,
@@ -35,9 +36,12 @@ function App() {
   const [isGeneratingDaily, setIsGeneratingDaily] = useState(false);
 
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily'>('jira');
+  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily' | 'evidence'>('jira');
   const [calendarSource, setCalendarSource] = useState<string>("");
   const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
+
+  const [evidencePath, setEvidencePath] = useState("");
+  const [isGeneratingEvidence, setIsGeneratingEvidence] = useState(false);
 
   const [totalHours, setTotalHours] = useState<number>(0);
   const [isSendingToJira, setIsSendingToJira] = useState(false);
@@ -161,6 +165,22 @@ function App() {
       navigator.clipboard.writeText(generatedDaily);
       showNotification("¡Daily copiado al portapapeles!");
     }
+  };
+
+  const generateEvidence = async () => {
+    if (!evidencePath) {
+      showNotification("Por favor ingresa la ruta de la carpeta.", 'error');
+      return;
+    }
+    setIsGeneratingEvidence(true);
+    try {
+      const res = await axios.post(`${API_BASE}/evidence/generate`, { directory_path: evidencePath });
+      showNotification(`✅ Reporte generado con éxito en: ${res.data.output_path}`);
+    } catch (e: any) {
+      const errorMsg = e.response?.data?.detail || "Error al generar el reporte.";
+      showNotification(errorMsg, 'error');
+    }
+    setIsGeneratingEvidence(false);
   };
 
   const exportToCSV = () => {
@@ -357,6 +377,9 @@ function App() {
           </button>
           <button className={activeTab === 'daily' ? '' : 'secondary'} onClick={() => setActiveTab('daily')}>
             <MessageSquare size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Daily Status
+          </button>
+          <button className={activeTab === 'evidence' ? '' : 'secondary'} onClick={() => setActiveTab('evidence')}>
+            <FileText size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Evidencias
           </button>
         </nav>
       </header>
@@ -588,6 +611,80 @@ function App() {
                   No hay eventos próximos en tu calendario.
                 </p>
               )}
+            </div>
+          </div>
+        </main>
+      )}
+
+      {activeTab === 'evidence' && (
+        <main>
+          <div className="glass-panel card">
+            <h2><FileText size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Generador de Evidencias</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+              Genera automáticamente un documento Word con las capturas de pantalla y videos de tus pruebas. 
+              El sistema buscará subcarpetas (una por cada Caso de Prueba) y procesará imágenes y videos.
+            </p>
+            
+            <div style={{ marginBottom: '2rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Ruta local de la carpeta de evidencias:
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  placeholder="Ej: C:\Users\Nombre\Documents\Evidencias\Release_1"
+                  value={evidencePath}
+                  onChange={(e) => setEvidencePath(e.target.value)}
+                  style={{ 
+                    flex: 1, 
+                    background: 'rgba(0,0,0,0.2)', 
+                    border: '1px solid var(--border-color)', 
+                    borderRadius: '6px', 
+                    padding: '0.6rem', 
+                    color: 'white',
+                    fontSize: '0.9rem'
+                  }}
+                />
+                {evidencePath && (
+                  <button 
+                    className="secondary" 
+                    onClick={() => setEvidencePath("")}
+                    style={{ padding: '0.6rem' }}
+                    title="Limpiar ruta"
+                  >
+                    ✕
+                  </button>
+                )}
+                <button 
+                  className="secondary" 
+                  onClick={async () => {
+                    try {
+                      const res = await axios.get(`${API_BASE}/evidence/pick-dir`);
+                      if (res.data.path) setEvidencePath(res.data.path);
+                    } catch (e) {
+                      showNotification("No se pudo abrir el selector de carpetas.", "error");
+                    }
+                  }}
+                  title="Seleccionar carpeta desde el equipo"
+                >
+                  Buscar...
+                </button>
+                <button onClick={generateEvidence} disabled={isGeneratingEvidence || !evidencePath}>
+                  {isGeneratingEvidence ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} style={{ marginRight: '6px' }} />}
+                  Generar Reporte Word
+                </button>
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(88, 166, 255, 0.05)', borderLeft: '4px solid var(--accent-color)' }}>
+              <h4 style={{ marginBottom: '1rem', color: 'var(--accent-color)' }}>💡 Instrucciones de uso</h4>
+              <ul style={{ fontSize: '0.9rem', color: 'var(--text-primary)', paddingLeft: '1.2rem', lineHeight: '1.6' }}>
+                <li>Crea una carpeta raíz para tu iniciativa.</li>
+                <li>Dentro, crea una subcarpeta por cada Caso de Prueba (ej: <strong>CP01_Login</strong>).</li>
+                <li>Guarda las imágenes (.png, .jpg) y videos (.mp4) dentro de cada subcarpeta.</li>
+                <li>El sistema tomará capturas automáticas de los videos e insertará todo en el Word.</li>
+                <li>El archivo final se guardará en la misma carpeta raíz que indicaste.</li>
+              </ul>
             </div>
           </div>
         </main>
