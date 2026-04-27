@@ -42,6 +42,7 @@ function App() {
 
   const [evidencePath, setEvidencePath] = useState("");
   const [isGeneratingEvidence, setIsGeneratingEvidence] = useState(false);
+  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
 
   const [totalHours, setTotalHours] = useState<number>(0);
   const [isSendingToJira, setIsSendingToJira] = useState(false);
@@ -211,6 +212,69 @@ function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const createEvidenceFolders = async () => {
+    if (!testCases) return;
+
+    let csvContent = "";
+    const match = testCases.match(/```(?:csv)?\n([\s\S]*?)\n```/);
+    if (match && match[1]) {
+      csvContent = match[1];
+    } else {
+      csvContent = testCases.replace(/```csv/g, '').replace(/```/g, '').trim();
+    }
+
+    if (!csvContent || csvContent.length < 10) {
+      showNotification("No hay casos de prueba válidos para crear carpetas.", 'error');
+      return;
+    }
+
+    // Extraer nombres (saltando la cabecera si existe)
+    const lines = csvContent.split('\n').filter(l => l.trim());
+    let startIndex = 0;
+    if (lines[0].includes('NOMBRE CASO PRUEBA')) {
+      startIndex = 1;
+    }
+    
+    const casesList = [];
+    for (let i = startIndex; i < lines.length; i++) {
+      const cols = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/(^"|"$)/g, ''));
+      if (cols.length >= 1 && cols[0]) {
+        casesList.push(cols[0]);
+      }
+    }
+
+    if (casesList.length === 0) {
+      showNotification("No se detectaron nombres de casos de prueba.", 'error');
+      return;
+    }
+
+    const inProgressTask = tasks.find(t => t.status.toLowerCase().includes('en curso') || t.status.toLowerCase().includes('progress'));
+    let initiative = "";
+    
+    if (inProgressTask) {
+      // Intentar extraer el prefijo entre corchetes, o usar el summary completo
+      const match = inProgressTask.summary.match(/^\[(.*?)\]/);
+      initiative = match ? `[${match[1]}]` : inProgressTask.summary;
+    } else {
+      initiative = prompt("No se encontró tarea 'En curso' en Jira. Ingresa manualmente el nombre de la Iniciativa para la carpeta Padre:", "") || "";
+    }
+
+    if (!initiative) return;
+
+    setIsCreatingFolders(true);
+    try {
+      const res = await axios.post(`${API_BASE}/evidence/create-structure`, {
+        initiative_name: initiative,
+        test_cases: casesList
+      });
+      showNotification(`✅ Estructura creada en: ${res.data.result.path}`);
+    } catch (e: any) {
+      const errorMsg = e.response?.data?.detail || "Error al crear la estructura de carpetas.";
+      showNotification(errorMsg, 'error');
+    }
+    setIsCreatingFolders(false);
   };
 
   const sumTodayHours = () => {
@@ -517,7 +581,7 @@ function App() {
           </div>
 
           <div className="glass-panel card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'nowrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h3 style={{ margin: 0, whiteSpace: 'nowrap' }}>
                   <ClipboardCheck size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
@@ -536,9 +600,15 @@ function App() {
                 )}
               </div>
               {testCases && (
-                <button onClick={exportToCSV} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                  <Download size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Exportar CSV
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+                  <button onClick={createEvidenceFolders} disabled={isCreatingFolders} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', whiteSpace: 'nowrap', borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }} title="Crear estructura de carpetas en Certificaciones">
+                    {isCreatingFolders ? <Loader2 size={14} className="spin" /> : <Archive size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />}
+                    Crear Carpetas
+                  </button>
+                  <button onClick={exportToCSV} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                    <Download size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Exportar CSV
+                  </button>
+                </div>
               )}
             </div>
 

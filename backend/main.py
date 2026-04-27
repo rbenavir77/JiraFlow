@@ -36,6 +36,10 @@ class MeetingSubtaskRequest(BaseModel):
 class EvidenceRequest(BaseModel):
     directory_path: str
 
+class EvidenceFolderRequest(BaseModel):
+    initiative_name: str
+    test_cases: List[str]
+
 @app.get("/")
 def read_root():
     return {"status": "JiraFlow API is running"}
@@ -110,6 +114,14 @@ def generate_evidence(req: EvidenceRequest):
         return {"status": "success", "output_path": output_path}
     except Exception as e:
         # Devolver el mensaje de error directamente para que el front lo muestre
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/evidence/create-structure")
+def create_evidence_structure(req: EvidenceFolderRequest):
+    try:
+        result = evidence_svc.create_evidence_structure(req.initiative_name, req.test_cases)
+        return {"status": "success", "result": result}
+    except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/evidence/pick-dir")

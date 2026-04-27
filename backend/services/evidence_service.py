@@ -226,3 +226,35 @@ class EvidenceService:
 
         if found_content:
             doc.add_page_break()
+
+    def create_evidence_structure(self, initiative_name: str, test_cases: list):
+        """Crea la estructura de carpetas de evidencia en Documents/Certificaciones."""
+        import re
+        
+        # 1. Obtener ruta a Documentos/Certificaciones dinámicamente
+        docs_path = os.path.expanduser("~\\Documents\\Certificaciones")
+        
+        # Limpiar nombre de la iniciativa para que sea válido en Windows
+        safe_initiative = re.sub(r'[<>:"/\\|?*]', '_', initiative_name).strip()
+        initiative_path = os.path.join(docs_path, safe_initiative)
+        
+        # Crear carpeta padre
+        os.makedirs(initiative_path, exist_ok=True)
+        
+        # Crear subcarpetas
+        created_folders = []
+        for tc in test_cases:
+            if not tc.strip(): continue
+            safe_tc = re.sub(r'[<>:"/\\|?*]', '_', tc).strip()
+            tc_path = os.path.join(initiative_path, safe_tc)
+            os.makedirs(tc_path, exist_ok=True)
+            created_folders.append(safe_tc)
+            
+        # Abrir la carpeta en el explorador de archivos de Windows
+        if os.name == 'nt':
+            os.startfile(initiative_path)
+            
+        return {
+            "path": initiative_path,
+            "folders_created": len(created_folders)
+        }
