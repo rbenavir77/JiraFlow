@@ -150,7 +150,7 @@ class EvidenceService:
         for item in sorted(os.listdir(root_dir)):
             item_path = os.path.join(root_dir, item)
             if os.path.isdir(item_path) and not item.startswith('_') and not item.startswith('.'):
-                self._add_folder_to_doc(doc, item_path, f"Carpeta: {item}", recursive=True)
+                self._add_folder_to_doc(doc, item_path, item, recursive=True)
 
         try:
             doc.save(output_path)
