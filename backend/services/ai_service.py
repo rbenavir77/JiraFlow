@@ -97,23 +97,40 @@ class AIService:
         return self._generate_content(prompt)
 
     def generate_daily_status(self, notes):
-        """Genera un reporte diario basado en notas sueltas, con formato estructurado."""
+        """Genera un reporte diario basado en notas sueltas, actuando como un organizador lógico estricto."""
         prompt = f"""
-        Actúa como un Senior QA Lead redactando un Daily Status profesional.
-        
-        CONTEXTO: Proyecto eCommerce SB (QA testing). El reporte será presentado en la Daily Standup del equipo.
-        
-        Basado en las siguientes notas/actividades, redacta un reporte Daily Status estructurado y coherente:
-        
-        NOTAS DEL DÍA: {notes}
-        
-        REGLAS OBLIGATORIAS:
-        1. Usa un tono profesional, técnico y conciso (máximo 200 palabras totales).
-        2. Estructura el reporte con exactamente estas 3 secciones con headers en negrita:
-           - **¿Que hice hoy?**: redacta de mejor forma lo que ya yo entrego por escrito.
-           - **¿Qué haré hoy?**: Especifica qué vas a hacer hoy, prioridades.
-           - **¿Tengo impedimentos/bloqueantes?**: Lista solo impedimentos reales. Si no hay, escribe "Ninguno en este momento."
-        
-        Responde SOLO con el reporte formateado, sin introducción ni explicaciones adicionales.
+        Actúa como un transcriptor y organizador lógico de Daily Status para un QA Senior.
+        Tu objetivo es clasificar lo que el usuario escribe de corrido en 3 secciones específicas, sin añadir NADA de tu propia cosecha.
+
+        NOTAS DEL USUARIO: "{notes}"
+
+        INSTRUCCIONES DE CLASIFICACIÓN (Mapeo Lógico):
+        1. Sección "¿Qué hice hoy?": Aquí debes poner todo lo que el usuario mencione como pasado o realizado hoy (ej: "hoy hice", "avancé", "terminé", "ayer", "participé").
+        2. Sección "¿Qué haré hoy?": Aquí debes poner lo que el usuario mencione como futuro o pendiente (ej: "mañana", "voy a", "haré", "quedó pendiente", "tengo que"). 
+           *Si el usuario no menciona nada para mañana, deja solo un punto que diga: "Continuar con las actividades del ciclo."
+        3. Sección "¿Tengo impedimentos/bloqueantes?": Aquí va cualquier problema mencionado. 
+           *Si el usuario dice "sin bloqueos", "sin impedimentos" o no menciona nada negativo, escribe obligatoriamente: "Ninguno en este momento."
+
+        REGLAS DE ORO (PROHIBICIONES):
+        - PROHIBIDO inventar porcentajes (ej: no pongas "40%" si el usuario no lo dijo).
+        - PROHIBIDO inventar nombres de proyectos o releases.
+        - PROHIBIDO añadir frases de relleno como "Me enfocaré en..." o "Se espera que...".
+        - Usa un lenguaje directo y técnico, tal como lo haría un QA.
+
+        FORMATO DE SALIDA (ESTRICTO):
+        ¿Qué hice hoy?
+        ● [Punto 1]
+        ● [Punto 2]
+
+        ¿Qué haré hoy?
+        ● [Punto 1]
+
+        ¿Tengo impedimentos/bloqueantes?
+        ● [Punto 1]
+
+        IMPORTANTE: 
+        - Usa solo el círculo '●' para las viñetas.
+        - No uses negritas ni Markdown extra. Solo texto plano estructurado.
+        - Responde ÚNICAMENTE con el reporte.
         """
         return self._generate_content(prompt)
