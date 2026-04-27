@@ -66,39 +66,49 @@ class EvidenceService:
         video_stem = unicodedata.normalize('NFKD', stem).encode('ascii', 'ignore').decode('ascii')
         video_stem = "".join([c for c in video_stem if c.isalnum() or c in (' ', '_', '-')]).strip()[:30]
         
-        candidates = [0.15, 0.35, 0.65, 0.85] 
+        # Puntos de captura optimizados para el flujo de pago
+        candidates = [0.10, 0.25, 0.50, 0.75, 0.98] 
+        
         for i, pos in enumerate(candidates):
             frame_idx = int(total_frames * pos)
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
             
-            found_bright = False
-            for attempt in range(50):
+            found_frame = False
+            # Búsqueda rápida en un rango de 100 frames
+            for attempt in range(100):
                 ret, frame = cap.read()
                 if not ret: break
                 
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 brightness = gray.mean()
+                std_dev = gray.std()
                 
-                if brightness > 30:
+                # Criterio equilibrado: Luz y Contraste básico
+                if brightness > 45 and std_dev > 18:
                     frame_name = f"tmp_{video_stem.replace(' ', '_')}_{i+1}.jpg"
                     frame_path = os.path.join(output_folder, frame_name)
                     
-                    # Usar un método más robusto para escribir archivos con OpenCV en Windows (vía buffer)
                     success, img_encoded = cv2.imencode('.jpg', frame)
                     if success:
                         with open(frame_path, 'wb') as f:
                             f.write(img_encoded)
                         extracted_paths.append(frame_path)
-                        print(f"[EvidenceService] Captura {i+1} generada.")
-                        found_bright = True
+                        print(f"[EvidenceService] Captura {i+1} OK.")
+                        found_frame = True
                     break
             
-            if not found_bright:
-                print(f"[EvidenceService] WARN: No se encontró frame claro en {pos}")
+            if not found_frame:
+                # Fallback rápido si no hay nada ideal cerca
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                ret, frame = cap.read()
+                if ret:
+                    frame_name = f"tmp_{video_stem.replace(' ', '_')}_{i+1}.jpg"
+                    frame_path = os.path.join(output_folder, frame_name)
+                    cv2.imwrite(frame_path, frame)
+                    extracted_paths.append(frame_path)
         
         cap.release()
         return extracted_paths
-
     def generate_report(self, root_dir, output_name=None):
         """Escanea el directorio y genera el documento Word con soporte para archivos en raíz y subcarpetas."""
         root_dir = os.path.normpath(root_dir.strip().replace('"', '').replace("'", ""))
