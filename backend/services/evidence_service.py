@@ -167,6 +167,172 @@ class EvidenceService:
 
         return output_path
 
+    def generate_html_report(self, root_dir, output_name=None):
+        """Escanea el directorio y genera un reporte HTML con videos incrustados nativamente."""
+        import base64
+        root_dir = os.path.normpath(root_dir.strip().replace('"', '').replace("'", ""))
+        
+        if not os.path.exists(root_dir):
+            raise Exception(f"La ruta especificada no existe: {root_dir}")
+        
+        timestamp = datetime.datetime.now().strftime("%d%m_%H%M")
+        if output_name is None:
+            output_name = f"Reporte_Evidencias_{timestamp}.html"
+            
+        output_path = os.path.join(root_dir, output_name)
+        
+        # Iniciar HTML con CSS moderno
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Reporte de Evidencias - {os.path.basename(root_dir)}</title>
+            <style>
+                :root {{
+                    --bg-color: #0f172a;
+                    --text-color: #f8fafc;
+                    --card-bg: #1e293b;
+                    --accent: #3b82f6;
+                    --border: #334155;
+                }}
+                body {{
+                    font-family: 'Segoe UI', system-ui, sans-serif;
+                    background-color: var(--bg-color);
+                    color: var(--text-color);
+                    margin: 0;
+                    padding: 2rem;
+                    line-height: 1.6;
+                }}
+                .container {{
+                    max-width: 1000px;
+                    margin: 0 auto;
+                }}
+                .header {{
+                    background: var(--card-bg);
+                    padding: 2rem;
+                    border-radius: 12px;
+                    border: 1px solid var(--border);
+                    margin-bottom: 2rem;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                }}
+                h1 {{ margin-top: 0; color: var(--accent); font-size: 1.8rem; }}
+                .section {{
+                    background: var(--card-bg);
+                    padding: 2rem;
+                    border-radius: 12px;
+                    border: 1px solid var(--border);
+                    margin-bottom: 2rem;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                }}
+                .section h2 {{
+                    border-bottom: 2px solid var(--border);
+                    padding-bottom: 0.5rem;
+                    margin-top: 0;
+                    color: #94a3b8;
+                    font-size: 1.4rem;
+                }}
+                .media-item {{
+                    margin-bottom: 2rem;
+                    text-align: center;
+                }}
+                img, video {{
+                    max-width: 100%;
+                    max-height: 700px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    background: #000;
+                }}
+                @media (max-width: 600px) {{
+                    body {{ padding: 1rem; }}
+                    .header, .section {{ padding: 1.2rem; }}
+                    h1 {{ font-size: 1.5rem; }}
+                    .section h2 {{ font-size: 1.2rem; }}
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Reporte de Evidencias de QA</h1>
+                    <p><strong>Iniciativa:</strong> {os.path.basename(root_dir)}</p>
+                    <p><strong>Fecha:</strong> {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
+                    <p><strong>Ruta Original:</strong> {root_dir}</p>
+                </div>
+        """
+
+        image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif')
+        video_extensions = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
+
+        def process_folder(folder_path, title):
+            nonlocal html_content
+            files = sorted(os.listdir(folder_path))
+            evidence_files = [f for f in files if f.lower().endswith(image_extensions + video_extensions)]
+            
+            if not evidence_files:
+                return
+
+            html_content += f'<div class="section">\n<h2>{title}</h2>\n'
+            
+            for file in evidence_files:
+                file_path = os.path.join(folder_path, file)
+                
+                try:
+                    with open(file_path, "rb") as f:
+                        file_data = f.read()
+                    
+                    b64_data = base64.b64encode(file_data).decode('utf-8')
+                    
+                    if file.lower().endswith(image_extensions):
+                        ext = file.split('.')[-1].lower()
+                        mime = f"image/{ext}" if ext != 'jpg' else "image/jpeg"
+                        html_content += f"""
+                        <div class="media-item">
+                            <img src="data:{mime};base64,{b64_data}" alt="{file}" />
+                        </div>
+                        """
+                    elif file.lower().endswith(video_extensions):
+                        ext = file.split('.')[-1].lower()
+                        mime = f"video/{ext}" if ext != 'mkv' else "video/x-matroska"
+                        html_content += f"""
+                        <div class="media-item">
+                            <video controls preload="metadata">
+                                <source src="data:{mime};base64,{b64_data}" type="{mime}">
+                                Tu navegador no soporta el tag de video.
+                            </video>
+                        </div>
+                        """
+                except Exception as e:
+                    print(f"[EvidenceService] ERROR al procesar para HTML {file}: {str(e)}")
+                    html_content += f'<p style="color: #ef4444;">Error al cargar {file}</p>'
+                    
+            html_content += '</div>\n'
+
+        # 1. Procesar raíz
+        process_folder(root_dir, "Evidencias Generales (Raíz)")
+
+        # 2. Procesar subcarpetas
+        for item in sorted(os.listdir(root_dir)):
+            item_path = os.path.join(root_dir, item)
+            if os.path.isdir(item_path) and not item.startswith('_') and not item.startswith('.'):
+                process_folder(item_path, item)
+
+        html_content += """
+            </div>
+        </body>
+        </html>
+        """
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        print(f"[EvidenceService] Reporte HTML generado en: {output_path}")
+        return output_path
+
     def _add_folder_to_doc(self, doc, folder_path, title, recursive=False):
         """Agrega el contenido de una carpeta al documento."""
         files = sorted(os.listdir(folder_path))

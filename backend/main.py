@@ -35,6 +35,7 @@ class MeetingSubtaskRequest(BaseModel):
 
 class EvidenceRequest(BaseModel):
     directory_path: str
+    format: str = "docx"
 
 class EvidenceFolderRequest(BaseModel):
     initiative_name: str
@@ -110,7 +111,11 @@ def get_events():
 @app.post("/evidence/generate")
 def generate_evidence(req: EvidenceRequest):
     try:
-        output_path = evidence_svc.generate_report(req.directory_path)
+        if req.format.lower() == "html":
+            output_path = evidence_svc.generate_html_report(req.directory_path)
+        else:
+            output_path = evidence_svc.generate_report(req.directory_path)
+            
         return {"status": "success", "output_path": output_path}
     except Exception as e:
         # Devolver el mensaje de error directamente para que el front lo muestre

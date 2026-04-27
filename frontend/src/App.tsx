@@ -41,7 +41,7 @@ function App() {
   const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
   const [evidencePath, setEvidencePath] = useState("");
-  const [isGeneratingEvidence, setIsGeneratingEvidence] = useState(false);
+  const [generatingFormat, setGeneratingFormat] = useState<'docx' | 'html' | null>(null);
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
 
   const [totalHours, setTotalHours] = useState<number>(0);
@@ -168,20 +168,20 @@ function App() {
     }
   };
 
-  const generateEvidence = async () => {
+  const generateEvidence = async (format: 'docx' | 'html' = 'docx') => {
     if (!evidencePath) {
       showNotification("Por favor ingresa la ruta de la carpeta.", 'error');
       return;
     }
-    setIsGeneratingEvidence(true);
+    setGeneratingFormat(format);
     try {
-      const res = await axios.post(`${API_BASE}/evidence/generate`, { directory_path: evidencePath });
+      const res = await axios.post(`${API_BASE}/evidence/generate`, { directory_path: evidencePath, format });
       showNotification(`✅ Reporte generado con éxito en: ${res.data.output_path}`);
     } catch (e: any) {
       const errorMsg = e.response?.data?.detail || "Error al generar el reporte.";
       showNotification(errorMsg, 'error');
     }
-    setIsGeneratingEvidence(false);
+    setGeneratingFormat(null);
   };
 
   const exportToCSV = () => {
@@ -736,12 +736,17 @@ function App() {
                     }
                   }}
                   title="Seleccionar carpeta desde el equipo"
+                  style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}
                 >
                   Buscar...
                 </button>
-                <button onClick={generateEvidence} disabled={isGeneratingEvidence || !evidencePath}>
-                  {isGeneratingEvidence ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} style={{ marginRight: '6px' }} />}
-                  Generar Reporte Word
+                <button onClick={() => generateEvidence('docx')} disabled={generatingFormat !== null || !evidencePath} className="secondary" style={{ marginRight: '0.5rem', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
+                  {generatingFormat === 'docx' ? <Loader2 size={16} className="spin" /> : <FileText size={16} style={{ marginRight: '6px' }} />}
+                  Generar Word
+                </button>
+                <button onClick={() => generateEvidence('html')} disabled={generatingFormat !== null || !evidencePath} style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
+                  {generatingFormat === 'html' ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} style={{ marginRight: '6px' }} />}
+                  Generar Web HTML
                 </button>
               </div>
             </div>
