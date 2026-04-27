@@ -192,19 +192,17 @@ class EvidenceService:
             
             if file.lower().endswith(image_extensions):
                 found_content = True
-                doc.add_paragraph(f"Evidencia: {file}")
                 try:
                     # Usar un ancho algo menor para asegurar que quepa en los márgenes
                     doc.add_picture(file_path, width=Inches(5.8))
                     doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
                 except Exception as e:
                     print(f"[EvidenceService] ERROR al insertar imagen {file}: {str(e)}")
-                    doc.add_paragraph(f"(Error al insertar imagen {file})")
+                    doc.add_paragraph(f"(Error al insertar imagen)")
                 doc.add_paragraph("") 
 
             elif file.lower().endswith(video_extensions):
                 found_content = True
-                doc.add_paragraph(f"Capturas de Video: {file}")
                 # Las capturas ahora van a la carpeta temporal central
                 frame_paths = self.extract_frames_from_video(file_path)
                 
