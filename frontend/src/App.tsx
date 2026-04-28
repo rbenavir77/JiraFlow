@@ -15,7 +15,8 @@ import {
   MessageSquare,
   Copy,
   Archive,
-  RefreshCcw
+  RefreshCcw,
+  PieChart
 } from 'lucide-react';
 import './index.css';
 
@@ -43,6 +44,12 @@ function App() {
   const [evidencePath, setEvidencePath] = useState("");
   const [generatingFormat, setGeneratingFormat] = useState<'docx' | 'html' | null>(null);
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+
+  // Metricas State
+  const [metricsTotal, setMetricsTotal] = useState<number | "">("");
+  const [metricsPassed, setMetricsPassed] = useState<number | "">("");
+  const [metricsFailed, setMetricsFailed] = useState<number | "">("");
+  const [metricsNA, setMetricsNA] = useState<number | "">("");
 
   const [totalHours, setTotalHours] = useState<number>(0);
   const [isSendingToJira, setIsSendingToJira] = useState(false);
@@ -445,6 +452,9 @@ function App() {
           <button className={activeTab === 'evidence' ? '' : 'secondary'} onClick={() => setActiveTab('evidence')}>
             <FileText size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Evidencias
           </button>
+          <button className={activeTab === 'metrics' ? '' : 'secondary'} onClick={() => setActiveTab('metrics')}>
+            <PieChart size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Métricas
+          </button>
         </nav>
       </header>
 
@@ -807,6 +817,180 @@ function App() {
                 <p>Escribe tus notas y genera tu Daily formal y sin iconos.</p>
               </div>
             )}
+          </div>
+        </main>
+      )}
+
+      {activeTab === 'metrics' && (
+        <main className="grid">
+          <div className="glass-panel card">
+            <h3><PieChart size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Ingreso de Datos</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.5rem 0 1.5rem' }}>
+              Ingresa la cantidad de casos para calcular automáticamente el avance y generar el tacómetro.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Casos Totales</label>
+                <input 
+                  type="number" 
+                  value={metricsTotal} 
+                  onChange={(e) => setMetricsTotal(e.target.value ? Number(e.target.value) : "")}
+                  placeholder="Ej: 20"
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#22c55e' }}>Passed (Aprobados)</label>
+                  <input 
+                    type="number" 
+                    value={metricsPassed} 
+                    onChange={(e) => setMetricsPassed(e.target.value ? Number(e.target.value) : "")}
+                    placeholder="0"
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#ef4444' }}>Failed (Fallados)</label>
+                  <input 
+                    type="number" 
+                    value={metricsFailed} 
+                    onChange={(e) => setMetricsFailed(e.target.value ? Number(e.target.value) : "")}
+                    placeholder="0"
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>No Aplica (N/A)</label>
+                <input 
+                  type="number" 
+                  value={metricsNA} 
+                  onChange={(e) => setMetricsNA(e.target.value ? Number(e.target.value) : "")}
+                  placeholder="0"
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
+                />
+              </div>
+            </div>
+            
+            <div style={{ marginTop: '2rem' }}>
+              <button 
+                onClick={() => {
+                  setMetricsTotal(""); setMetricsPassed(""); setMetricsFailed(""); setMetricsNA("");
+                }} 
+                className="secondary" 
+                style={{ width: '100%' }}
+              >
+                Limpiar Datos
+              </button>
+            </div>
+          </div>
+
+          <div className="glass-panel card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3><LayoutDashboard size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Dashboard de Avance</h3>
+              <button onClick={() => {
+                const t = Number(metricsTotal) || 0;
+                const p = Number(metricsPassed) || 0;
+                const f = Number(metricsFailed) || 0;
+                const na = Number(metricsNA) || 0;
+                const validTotal = Math.max(0, t - na);
+                const executed = p + f;
+                const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
+                const successRate = executed > 0 ? (p / executed) * 100 : 0;
+                
+                const text = `📊 *Reporte de Avance QA*\n- *Casos Totales:* ${t}\n- *No Aplica (N/A):* ${na}\n- *Total Válido:* ${validTotal}\n\n✅ *Ejecutados:* ${executed} (${progress.toFixed(1)}%)\n  - Passed: ${p}\n  - Failed: ${f}\n\n🎯 *Tasa de Éxito:* ${successRate.toFixed(1)}%`;
+                navigator.clipboard.writeText(text);
+                showNotification("¡Métricas copiadas al portapapeles para Jira!");
+              }} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                <Copy size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Copiar para Jira
+              </button>
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+              {(() => {
+                const t = Number(metricsTotal) || 0;
+                const p = Number(metricsPassed) || 0;
+                const f = Number(metricsFailed) || 0;
+                const na = Number(metricsNA) || 0;
+
+                const validTotal = Math.max(0, t - na);
+                const executed = p + f;
+                const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
+                const successRate = executed > 0 ? (p / executed) * 100 : 0;
+                
+                const r = 80;
+                const dashArray = Math.PI * r; // 251.32
+
+                // Proporciones (sobre validTotal)
+                const pProp = validTotal > 0 ? p / validTotal : 0;
+                const fProp = validTotal > 0 ? f / validTotal : 0;
+
+                const pDash = pProp * dashArray;
+                const fDash = fProp * dashArray;
+
+                return (
+                  <div style={{ width: '100%', textAlign: 'center' }}>
+                    <div style={{ position: 'relative', width: '280px', margin: '0 auto' }}>
+                      <svg viewBox="0 0 200 120" style={{ width: '100%', height: 'auto', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>
+                        {/* Fondo Gris (Restante) */}
+                        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="16" strokeLinecap="round" />
+                        
+                        {/* Failed (Rojo) */}
+                        {(pDash + fDash) > 0 && (
+                          <path 
+                            d="M 20 100 A 80 80 0 0 1 180 100" 
+                            fill="none" 
+                            stroke="#ef4444" 
+                            strokeWidth="16" 
+                            strokeLinecap="round"
+                            strokeDasharray={`${pDash + fDash} ${dashArray}`}
+                          />
+                        )}
+
+                        {/* Passed (Verde) */}
+                        {pDash > 0 && (
+                          <path 
+                            d="M 20 100 A 80 80 0 0 1 180 100" 
+                            fill="none" 
+                            stroke="#22c55e" 
+                            strokeWidth="16" 
+                            strokeLinecap="round"
+                            strokeDasharray={`${pDash} ${dashArray}`}
+                          />
+                        )}
+                      </svg>
+                      <div style={{ position: 'absolute', top: '55px', left: '0', right: '0' }}>
+                        <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--text-primary)', lineHeight: '1' }}>
+                          {Math.round(progress)}%
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                          Avance General
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '2rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Válidos</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{validTotal}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ejecutados</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{executed}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Tasa Éxito</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: successRate >= 80 ? '#22c55e' : (successRate > 0 ? '#ef4444' : 'inherit') }}>
+                          {Math.round(successRate)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </main>
       )}
