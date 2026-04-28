@@ -49,7 +49,9 @@ function App() {
   const [metricsTotal, setMetricsTotal] = useState<number | "">("");
   const [metricsPassed, setMetricsPassed] = useState<number | "">("");
   const [metricsFailed, setMetricsFailed] = useState<number | "">("");
+  const [metricsBlocked, setMetricsBlocked] = useState<number | "">("");
   const [metricsNA, setMetricsNA] = useState<number | "">("");
+  const [metricsDefects, setMetricsDefects] = useState<number | "">("");
 
   const [totalHours, setTotalHours] = useState<number>(0);
   const [isSendingToJira, setIsSendingToJira] = useState(false);
@@ -709,14 +711,15 @@ function App() {
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Ruta local de la carpeta de evidencias:
               </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <input 
                   type="text" 
                   placeholder="Ej: C:\Users\Nombre\Documents\Evidencias\Release_1"
                   value={evidencePath}
                   onChange={(e) => setEvidencePath(e.target.value)}
                   style={{ 
-                    flex: 1, 
+                    flex: '1 1 300px', 
+                    minWidth: '200px',
                     background: 'rgba(0,0,0,0.2)', 
                     border: '1px solid var(--border-color)', 
                     borderRadius: '6px', 
@@ -862,14 +865,36 @@ function App() {
                   />
                 </div>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#f59e0b' }}>Blocked (Bloqueados)</label>
+                  <input 
+                    type="number" 
+                    value={metricsBlocked} 
+                    onChange={(e) => setMetricsBlocked(e.target.value ? Number(e.target.value) : "")}
+                    placeholder="0"
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>No Aplica (N/A)</label>
+                  <input 
+                    type="number" 
+                    value={metricsNA} 
+                    onChange={(e) => setMetricsNA(e.target.value ? Number(e.target.value) : "")}
+                    placeholder="0"
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
+                  />
+                </div>
+              </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>No Aplica (N/A)</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--accent-color)' }}>Defectos Encontrados (Bugs)</label>
                 <input 
                   type="number" 
-                  value={metricsNA} 
-                  onChange={(e) => setMetricsNA(e.target.value ? Number(e.target.value) : "")}
+                  value={metricsDefects} 
+                  onChange={(e) => setMetricsDefects(e.target.value ? Number(e.target.value) : "")}
                   placeholder="0"
-                  style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--accent-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
                 />
               </div>
             </div>
@@ -877,7 +902,7 @@ function App() {
             <div style={{ marginTop: '2rem' }}>
               <button 
                 onClick={() => {
-                  setMetricsTotal(""); setMetricsPassed(""); setMetricsFailed(""); setMetricsNA("");
+                  setMetricsTotal(""); setMetricsPassed(""); setMetricsFailed(""); setMetricsBlocked(""); setMetricsNA(""); setMetricsDefects("");
                 }} 
                 className="secondary" 
                 style={{ width: '100%' }}
@@ -888,109 +913,97 @@ function App() {
           </div>
 
           <div className="glass-panel card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3><LayoutDashboard size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Dashboard de Avance</h3>
-              <button onClick={() => {
-                const t = Number(metricsTotal) || 0;
-                const p = Number(metricsPassed) || 0;
-                const f = Number(metricsFailed) || 0;
-                const na = Number(metricsNA) || 0;
-                const validTotal = Math.max(0, t - na);
-                const executed = p + f;
-                const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
-                const successRate = executed > 0 ? (p / executed) * 100 : 0;
-                
-                const text = `📊 *Reporte de Avance QA*\n- *Casos Totales:* ${t}\n- *No Aplica (N/A):* ${na}\n- *Total Válido:* ${validTotal}\n\n✅ *Ejecutados:* ${executed} (${progress.toFixed(1)}%)\n  - Passed: ${p}\n  - Failed: ${f}\n\n🎯 *Tasa de Éxito:* ${successRate.toFixed(1)}%`;
-                navigator.clipboard.writeText(text);
-                showNotification("¡Métricas copiadas al portapapeles para Jira!");
-              }} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                <Copy size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Copiar para Jira
-              </button>
-            </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3><LayoutDashboard size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Dashboard de Avance</h3>
+                <button onClick={() => {
+                  const t = Number(metricsTotal) || 0;
+                  const p = Number(metricsPassed) || 0;
+                  const f = Number(metricsFailed) || 0;
+                  const b = Number(metricsBlocked) || 0;
+                  const na = Number(metricsNA) || 0;
+                  const defects = Number(metricsDefects) || 0;
+                  const validTotal = Math.max(0, t - na);
+                  const executed = p + f + b;
+                  const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
+                  const successRate = (p + f) > 0 ? (p / (p + f)) * 100 : 0;
+                  
+                  const text = `📊 *Reporte de Avance QA*\n- *Casos Totales:* ${t}\n- *No Aplica (N/A):* ${na}\n- *Total Válido:* ${validTotal}\n\n✅ *Ejecutados:* ${executed} (${progress.toFixed(1)}%)\n  - Passed: ${p}\n  - Failed: ${f}\n  - Blocked: ${b}\n\n🎯 *Tasa de Éxito:* ${successRate.toFixed(1)}%\n🐞 *Defectos:* ${defects}`;
+                  navigator.clipboard.writeText(text);
+                  showNotification("¡Métricas copiadas al portapapeles para Jira!");
+                }} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                  <Copy size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Copiar para Jira
+                </button>
+              </div>
 
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              {(() => {
-                const t = Number(metricsTotal) || 0;
-                const p = Number(metricsPassed) || 0;
-                const f = Number(metricsFailed) || 0;
-                const na = Number(metricsNA) || 0;
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                {(() => {
+                  const t = Number(metricsTotal) || 0;
+                  const p = Number(metricsPassed) || 0;
+                  const f = Number(metricsFailed) || 0;
+                  const b = Number(metricsBlocked) || 0;
+                  const na = Number(metricsNA) || 0;
+                  const defects = Number(metricsDefects) || 0;
 
-                const validTotal = Math.max(0, t - na);
-                const executed = p + f;
-                const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
-                const successRate = executed > 0 ? (p / executed) * 100 : 0;
-                
-                const r = 80;
-                const dashArray = Math.PI * r; // 251.32
+                  const validTotal = Math.max(0, t - na);
+                  const executed = p + f + b;
+                  const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
+                  const successRate = (p + f) > 0 ? (p / (p + f)) * 100 : 0;
+                  const defectDensity = (p + f + b) > 0 ? (defects / (p + f + b)).toFixed(2) : "0.00";
+                  
+                  const r = 80;
+                  const dashArray = Math.PI * r;
 
-                // Proporciones (sobre validTotal)
-                const pProp = validTotal > 0 ? p / validTotal : 0;
-                const fProp = validTotal > 0 ? f / validTotal : 0;
+                  const pProp = validTotal > 0 ? p / validTotal : 0;
+                  const fProp = validTotal > 0 ? f / validTotal : 0;
+                  const bProp = validTotal > 0 ? b / validTotal : 0;
 
-                const pDash = pProp * dashArray;
-                const fDash = fProp * dashArray;
+                  const pDash = pProp * dashArray;
+                  const fDash = fProp * dashArray;
+                  const bDash = bProp * dashArray;
 
-                return (
-                  <div style={{ width: '100%', textAlign: 'center' }}>
-                    <div style={{ position: 'relative', width: '280px', margin: '0 auto' }}>
-                      <svg viewBox="0 0 200 120" style={{ width: '100%', height: 'auto', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>
-                        {/* Fondo Gris (Restante) */}
-                        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="16" strokeLinecap="round" />
-                        
-                        {/* Failed (Rojo) */}
-                        {(pDash + fDash) > 0 && (
-                          <path 
-                            d="M 20 100 A 80 80 0 0 1 180 100" 
-                            fill="none" 
-                            stroke="#ef4444" 
-                            strokeWidth="16" 
-                            strokeLinecap="round"
-                            strokeDasharray={`${pDash + fDash} ${dashArray}`}
-                          />
-                        )}
-
-                        {/* Passed (Verde) */}
-                        {pDash > 0 && (
-                          <path 
-                            d="M 20 100 A 80 80 0 0 1 180 100" 
-                            fill="none" 
-                            stroke="#22c55e" 
-                            strokeWidth="16" 
-                            strokeLinecap="round"
-                            strokeDasharray={`${pDash} ${dashArray}`}
-                          />
-                        )}
-                      </svg>
-                      <div style={{ position: 'absolute', top: '55px', left: '0', right: '0' }}>
-                        <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--text-primary)', lineHeight: '1' }}>
-                          {Math.round(progress)}%
-                        </div>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                          Avance General
+                  return (
+                    <div style={{ width: '100%', textAlign: 'center' }}>
+                      <div style={{ position: 'relative', width: '280px', margin: '0 auto' }}>
+                        <svg viewBox="0 0 200 120" style={{ width: '100%', height: 'auto', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>
+                          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="16" strokeLinecap="round" />
+                          {(pDash + fDash + bDash) > 0 && (
+                            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#f59e0b" strokeWidth="16" strokeLinecap="round" strokeDasharray={`${pDash + fDash + bDash} ${dashArray}`} />
+                          )}
+                          {(pDash + fDash) > 0 && (
+                            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#ef4444" strokeWidth="16" strokeLinecap="round" strokeDasharray={`${pDash + fDash} ${dashArray}`} />
+                          )}
+                          {pDash > 0 && (
+                            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#22c55e" strokeWidth="16" strokeLinecap="round" strokeDasharray={`${pDash} ${dashArray}`} />
+                          )}
+                        </svg>
+                        <div style={{ position: 'absolute', top: '55px', left: '0', right: '0' }}>
+                          <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--text-primary)', lineHeight: '1' }}>{Math.round(progress)}%</div>
+                          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Avance General</div>
                         </div>
                       </div>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '2rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                      <div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Válidos</div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{validTotal}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ejecutados</div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{executed}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Tasa Éxito</div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: successRate >= 80 ? '#22c55e' : (successRate > 0 ? '#ef4444' : 'inherit') }}>
-                          {Math.round(successRate)}%
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginTop: '2rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Válidos</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{validTotal}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Tasa Éxito</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: successRate >= 80 ? '#22c55e' : (successRate > 0 ? '#ef4444' : 'inherit') }}>{Math.round(successRate)}%</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Bugs</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: defects > 0 ? '#ef4444' : 'inherit' }}>{defects}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Densidad</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{defectDensity}</div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
+                  );
+                })()}
+              </div>
           </div>
         </main>
       )}
