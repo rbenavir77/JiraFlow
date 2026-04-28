@@ -37,7 +37,7 @@ function App() {
   const [isGeneratingDaily, setIsGeneratingDaily] = useState(false);
 
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily' | 'evidence'>('jira');
+  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily' | 'evidence' | 'metrics'>('jira');
   const [calendarSource, setCalendarSource] = useState<string>("");
   const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
