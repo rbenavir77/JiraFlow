@@ -70,18 +70,25 @@ class AIService:
     def generate_test_cases(self, refined_story):
         """Genera casos de prueba basados en una historia refinada."""
         prompt = f"""
-        Actúa como un Senior QA Automation Engineer.
-        Basado en la siguiente Historia de Usuario y sus Criterios de Aceptación, genera un conjunto completo de casos de prueba.
+        Actúa como un Senior QA Automation Engineer especializado en eCommerce SB.
+        Tu objetivo es generar CASOS DE PRUEBA FUNCIONALES DE ALTA CALIDAD, claros, ordenados y listos para ser importados en Xray (nuevo formato).
+
 
         Historia: {refined_story}
 
         REGLAS ESTRICTAS PARA LOS CASOS DE PRUEBA (Diseñados para importación a X-ray con nuevo formato):
+
         1. El "NOMBRE CASO PRUEBA" de CADA caso de prueba DEBE comenzar OBLIGATORIAMENTE con el prefijo "[Ecommerce_SB] ".
         2. Genera los casos de prueba siguiendo estrictamente el ORDEN LÓGICO Y CRONOLÓGICO de las tareas, desarrollos y criterios de aceptación descritos en la historia (muy importante para releases con múltiples desarrollos).
         3. Incluye Caminos felices (Positive paths), Casos de borde (Edge cases) y Escenarios de error (Negative tests).
         4. Fija "TIPO TC" a "Funcional".
         5. Fija "SISTEMA AFECTADO" a "eCommerce SB".
         6. Fija "CREADO POR" y "PERSONA ASIGNADA" a "Ricardo Alberto Benavides Rozas".
+        7. TODOS los casos de prueba deben seguir ESTRICTAMENTE el orden lógico y cronológico del flujo funcional descrito en la historia y sus criterios de aceptación.
+        8. Cada comportamiento distinto debe ser un caso de prueba independiente. NO agrupes múltiples escenarios en un solo caso.
+        9. Incluye cobertura completa de: Caminos felices (Positive), Casos de borde (Edge), Escenarios negativos / de error (Negative).
+        10. No inventes funcionalidades que no estén explícita o implícitamente descritas en la historia.
+        11. Utiliza redacción profesional, clara, específica y sin ambigüedades.
 
         Formatea el resultado ÚNICAMENTE como datos en formato CSV encerrados en un bloque de código ```csv ... ```.
         Usa EXACTAMENTE el carácter ";" (punto y coma) como separador de columnas. Encierra los valores relevantes entre comillas dobles si contienen comas o saltos de línea.
