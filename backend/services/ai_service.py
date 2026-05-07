@@ -90,6 +90,45 @@ class AIService:
         10. No inventes funcionalidades que no estén explícita o implícitamente descritas en la historia.
         11. Utiliza redacción profesional, clara, específica y sin ambigüedades.
 
+        ════════════════════════════════════
+        🔎 REGLAS AVANZADAS PARA EL PASO A PASO (OBLIGATORIAS)
+        ════════════════════════════════════
+        Las columnas STEP y ACCION son CRÍTICAS y deben cumplir estrictamente lo siguiente:
+        
+        1. STEP:
+           - Debe ser numérico, secuencial y comenzar en 1 para cada caso de prueba.
+           - Cada STEP representa UNA acción única y atómica.
+
+        2. ACCION:
+           - Debe describir acciones reales y ejecutables, no conceptos genéricos.
+           - Cada acción debe comenzar con un verbo en infinitivo (Ej: "Abrir", "Ingresar", "Seleccionar", "Validar", "Confirmar").
+           - NO usar frases vagas como:
+           "Realizar el proceso", "Completar flujo", "Ejecutar acción", "Validar comportamiento".
+           - Debe indicar explícitamente:
+           - Dónde actúa el usuario (pantalla, sección, módulo)
+              - Qué elemento interactúa (botón, campo, selector, link)
+           - Qué acción realiza
+
+        3. Descomposición obligatoria:
+           - No combines múltiples acciones en un solo paso.
+           - Si una acción requiere datos, la acción debe indicarlo claramente.
+           - Navegación, ingreso de datos, confirmaciones y validaciones deben ir en pasos separados.
+
+        4. Contexto eCommerce SB:
+           - Usa términos reales del dominio eCommerce (ej: carrito, checkout, medio de pago, despacho, resumen de compra).
+           - Asume flujos web reales (no acciones abstractas).
+
+        Ejemplo INCORRECTO:
+        "ACCION": "Completar proceso de compra"
+
+        Ejemplo CORRECTO:
+        "ACCION":
+        "1. Acceder al carrito de compras
+         2. Presionar botón 'Ir a pagar'
+         3. Seleccionar dirección de despacho
+         4. Seleccionar medio de pago válido
+         5. Confirmar la orden de compra"
+
         Formatea el resultado ÚNICAMENTE como datos en formato CSV encerrados en un bloque de código ```csv ... ```.
         Usa EXACTAMENTE el carácter ";" (punto y coma) como separador de columnas. Encierra los valores relevantes entre comillas dobles si contienen comas o saltos de línea.
         Las cabeceras deben ser EXACTAMENTE:

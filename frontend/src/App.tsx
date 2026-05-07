@@ -37,7 +37,7 @@ function App() {
   const [isGeneratingDaily, setIsGeneratingDaily] = useState(false);
 
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily' | 'evidence' | 'metrics'>('jira');
+  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily' | 'evidence'>('jira');
   const [calendarSource, setCalendarSource] = useState<string>("");
   const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
@@ -162,7 +162,25 @@ function App() {
     setIsGeneratingDaily(true);
     try {
       const res = await axios.post(`${API_BASE}/ai/daily-status`, { text: draftDaily });
-      setGeneratedDaily(res.data.daily_status);
+      let finalStatus = res.data.daily_status;
+
+      const t = Number(metricsTotal) || 0;
+      if (t > 0) {
+        const p = Number(metricsPassed) || 0;
+        const f = Number(metricsFailed) || 0;
+        const b = Number(metricsBlocked) || 0;
+        const na = Number(metricsNA) || 0;
+        const defects = Number(metricsDefects) || 0;
+        const validTotal = Math.max(0, t - na);
+        const executed = p + f + b;
+        const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
+        const successRate = (p + f) > 0 ? (p / (p + f)) * 100 : 0;
+        
+        const reportText = `\n\n📊 *Reporte de Avance QA*\n- *Casos Totales:* ${t}\n- *No Aplica (N/A):* ${na}\n- *Total Válido:* ${validTotal}\n\n✅ *Ejecutados:* ${executed} (${progress.toFixed(1)}%)\n  - Passed: ${p}\n  - Failed: ${f}\n  - Blocked: ${b}\n\n🎯 *Tasa de Éxito:* ${successRate.toFixed(1)}%\n🐞 *Defectos:* ${defects}`;
+        finalStatus += reportText;
+      }
+
+      setGeneratedDaily(finalStatus);
     } catch (e: any) {
       const errorDetail = e.response?.data?.detail || "El servicio de AI no está disponible.";
       showNotification(errorDetail, 'error');
@@ -355,7 +373,7 @@ function App() {
 
       if (cols.length >= 10) {
         elements.push(
-          <div key={i} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '1rem' }}>
+          <div key={i} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '1rem', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
             <div style={{ fontWeight: 'bold', color: 'var(--accent-color)', marginBottom: '12px', fontSize: '1.05rem' }}>{cols[0]}</div>
             <div style={{ marginBottom: '6px' }}><strong>Descripción:</strong> {cols[6]}</div>
             <div style={{ marginBottom: '6px' }}><strong>Pasos:</strong> {cols[7]}</div>
@@ -408,7 +426,9 @@ function App() {
               fontSize: '0.95rem', 
               lineHeight: '1.6', 
               boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)',
-              whiteSpace: 'pre-wrap'
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              overflowWrap: 'break-word'
             }}
             dangerouslySetInnerHTML={{ 
               __html: content
@@ -452,10 +472,7 @@ function App() {
             <MessageSquare size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Daily Status
           </button>
           <button className={activeTab === 'evidence' ? '' : 'secondary'} onClick={() => setActiveTab('evidence')}>
-            <FileText size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Evidencias
-          </button>
-          <button className={activeTab === 'metrics' ? '' : 'secondary'} onClick={() => setActiveTab('metrics')}>
-            <PieChart size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Métricas
+            <FileText size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Documentación
           </button>
         </nav>
       </header>
@@ -792,49 +809,16 @@ function App() {
               onChange={(e) => setDraftDaily(e.target.value)}
               style={{ minHeight: '120px' }}
             />
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <button onClick={generateDailyStatus} disabled={isGeneratingDaily || !draftDaily}>
-                {isGeneratingDaily ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />}
-                Generar Daily
-              </button>
-            </div>
-          </div>
-
-          <div className="glass-panel card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3><CheckCircle2 size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Resultado</h3>
-              {generatedDaily && (
-                <button onClick={copyDailyToClipboard} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                  <Copy size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Copiar
-                </button>
-              )}
-            </div>
-
-            {generatedDaily ? (
-              <div className="result-box" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', padding: '1rem', background: 'rgba(0,0,0,0.2)' }}>
-                {generatedDaily}
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--text-secondary)' }}>
-                <MessageSquare size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                <p>Escribe tus notas y genera tu Daily formal y sin iconos.</p>
-              </div>
-            )}
-          </div>
-        </main>
-      )}
-
-      {activeTab === 'metrics' && (
-        <main className="grid">
-          <div className="glass-panel card">
-            <h3><PieChart size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Ingreso de Datos</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.5rem 0 1.5rem' }}>
-              Ingresa la cantidad de casos para calcular automáticamente el avance y generar el tacómetro.
+            <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)' }} />
+            
+            <h4 style={{ marginBottom: '1rem', color: 'var(--accent-color)' }}><PieChart size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Métricas de Ejecución (Opcional)</h4>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '1rem' }}>
+              Si llenas estos campos, se calculará el % de avance y se incluirá en el reporte de Daily.
             </p>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Casos Totales</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Casos Totales</label>
                 <input 
                   type="number" 
                   value={metricsTotal} 
@@ -845,7 +829,7 @@ function App() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#22c55e' }}>Passed (Aprobados)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#22c55e' }}>Passed</label>
                   <input 
                     type="number" 
                     value={metricsPassed} 
@@ -855,7 +839,7 @@ function App() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#ef4444' }}>Failed (Fallados)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#ef4444' }}>Failed</label>
                   <input 
                     type="number" 
                     value={metricsFailed} 
@@ -867,7 +851,7 @@ function App() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#f59e0b' }}>Blocked (Bloqueados)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#f59e0b' }}>Blocked</label>
                   <input 
                     type="number" 
                     value={metricsBlocked} 
@@ -877,7 +861,7 @@ function App() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>No Aplica (N/A)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>N/A</label>
                   <input 
                     type="number" 
                     value={metricsNA} 
@@ -888,7 +872,7 @@ function App() {
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--accent-color)' }}>Defectos Encontrados (Bugs)</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--accent-color)' }}>Bugs Encontrados</label>
                 <input 
                   type="number" 
                   value={metricsDefects} 
@@ -899,22 +883,49 @@ function App() {
               </div>
             </div>
             
-            <div style={{ marginTop: '2rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <button onClick={generateDailyStatus} disabled={isGeneratingDaily || !draftDaily}>
+                {isGeneratingDaily ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />}
+                Generar Daily
+              </button>
               <button 
                 onClick={() => {
                   setMetricsTotal(""); setMetricsPassed(""); setMetricsFailed(""); setMetricsBlocked(""); setMetricsNA(""); setMetricsDefects("");
                 }} 
-                className="secondary" 
-                style={{ width: '100%' }}
+                className="secondary"
               >
-                Limpiar Datos
+                Limpiar Métricas
               </button>
             </div>
           </div>
 
-          <div className="glass-panel card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="glass-panel card" style={{ marginBottom: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3><LayoutDashboard size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Dashboard de Avance</h3>
+                <h3><CheckCircle2 size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Resultado</h3>
+                {generatedDaily && (
+                  <button onClick={copyDailyToClipboard} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                    <Copy size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Copiar
+                  </button>
+                )}
+              </div>
+
+              {generatedDaily ? (
+                <div className="result-box" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', padding: '1rem', background: 'rgba(0,0,0,0.2)' }}>
+                  {generatedDaily}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--text-secondary)' }}>
+                  <MessageSquare size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                  <p>Escribe tus notas y genera tu Daily formal y sin iconos.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Dashboard Tachometer */}
+            <div className="glass-panel card" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3><PieChart size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Dashboard de Avance</h3>
                 <button onClick={() => {
                   const t = Number(metricsTotal) || 0;
                   const p = Number(metricsPassed) || 0;
@@ -948,8 +959,6 @@ function App() {
                   const executed = p + f + b;
                   const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
                   const successRate = (p + f) > 0 ? (p / (p + f)) * 100 : 0;
-                  const defectDensity = (p + f + b) > 0 ? (defects / (p + f + b)).toFixed(2) : "0.00";
-                  
                   const r = 80;
                   const dashArray = Math.PI * r;
 
@@ -982,7 +991,7 @@ function App() {
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginTop: '2rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '2rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                         <div>
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Válidos</div>
                           <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{validTotal}</div>
@@ -995,18 +1004,17 @@ function App() {
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Bugs</div>
                           <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: defects > 0 ? '#ef4444' : 'inherit' }}>{defects}</div>
                         </div>
-                        <div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Densidad</div>
-                          <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{defectDensity}</div>
-                        </div>
                       </div>
                     </div>
                   );
                 })()}
               </div>
+            </div>
           </div>
         </main>
       )}
+
+
 
       <footer style={{
         marginTop: 'auto',
