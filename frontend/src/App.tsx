@@ -800,11 +800,11 @@ function App() {
           <div className="glass-panel card">
             <h3><MessageSquare size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Asistente de Daily Status</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.5rem 0 1rem' }}>
-              Escribe libremente lo que recuerdes que hiciste ayer, lo que vas a hacer hoy y si tienes bloqueos. La IA lo redactará por ti.
+              Escribe libremente lo que hiciste <strong>hoy</strong>, lo que vas a hacer <strong>mañana</strong> y si tienes bloqueos. La IA lo redactará por ti.
             </p>
             <textarea
               className="ai-textarea"
-              placeholder="Ej: Ayer revisé el ticket 1234, hoy voy a probar la subida a qa y no tengo bloqueos."
+              placeholder="Ej: Hoy revisé el ticket 1234, mañana voy a probar la subida a qa y no tengo bloqueos."
               value={draftDaily}
               onChange={(e) => setDraftDaily(e.target.value)}
               style={{ minHeight: '120px' }}

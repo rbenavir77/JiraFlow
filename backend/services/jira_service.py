@@ -54,6 +54,35 @@ class JiraService:
             return None
         return resp.json()
 
+    def _sanitize_url(self, url):
+        """Limpia y valida que el valor sea una URL absoluta."""
+        if not url:
+            return None
+        
+        # Si es una lista (Jira multi-select o multi-link), tomar el primer elemento
+        if isinstance(url, list):
+            url = url[0] if url else None
+            
+        # Si es un diccionario (algunos tipos de campos de Jira), intentar extraer la URL
+        if isinstance(url, dict):
+            url = url.get("url") or url.get("href") or url.get("value")
+            
+        if not isinstance(url, str):
+            return None
+            
+        url = url.strip()
+        if not url:
+            return None
+            
+        # Asegurar protocolo si parece un dominio conocido o tiene puntos
+        if url.startswith("comunidadesb.atlassian.net") or url.startswith("atlassian.net"):
+            url = "https://" + url
+        elif not url.startswith("http") and "." in url and "/" in url:
+            # Caso genérico para dominios sin protocolo que parecen URLs
+            url = "https://" + url
+            
+        return url if url.startswith("http") else None
+
     def _parse_issues(self, issues):
         """Parsea la lista de issues al formato que usa el frontend de forma eficiente."""
         if not issues:
@@ -76,7 +105,7 @@ class JiraService:
                     tqa_key = outward["key"]
                     break
 
-            confluence_url = fields.get("customfield_10126")
+            confluence_url = self._sanitize_url(fields.get("customfield_10126"))
             
             # Si no hay link en el padre pero hay un TQA asociado, lo anotamos para el bulk fetch
             if not confluence_url and tqa_key:
@@ -103,7 +132,7 @@ class JiraService:
                 
                 for t_issue in tqa_details:
                     t_key = t_issue["key"]
-                    t_url = t_issue.get("fields", {}).get("customfield_10126")
+                    t_url = self._sanitize_url(t_issue.get("fields", {}).get("customfield_10126"))
                     if t_url:
                         # Asignar la URL a todos los padres que apuntaban a este TQA
                         for p_idx in tqa_to_parent.get(t_key, []):

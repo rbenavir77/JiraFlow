@@ -85,10 +85,18 @@ class AIService:
         5. Fija "SISTEMA AFECTADO" a "eCommerce SB".
         6. Fija "CREADO POR" y "PERSONA ASIGNADA" a "Ricardo Alberto Benavides Rozas".
         7. TODOS los casos de prueba deben seguir ESTRICTAMENTE el orden lógico y cronológico del flujo funcional descrito en la historia y sus criterios de aceptación.
-        8. Cada comportamiento distinto debe ser un caso de prueba independiente. NO agrupes múltiples escenarios en un solo caso.
-        9. Incluye cobertura completa de: Caminos felices (Positive), Casos de borde (Edge), Escenarios negativos / de error (Negative).
-        10. No inventes funcionalidades que no estén explícita o implícitamente descritas en la historia.
-        11. Utiliza redacción profesional, clara, específica y sin ambigüedades.
+        8. Un caso de prueba debe validar un FLUJO FUNCIONAL COMPLETO, NO un paso individual. Acciones como "Acceder", "Editar", "Guardar" y "Verificar" deben ser pasos (STEPS) dentro del MISMO test, no tests independientes.
+        9. Escenarios distintos (ej: Usuario Registrado vs Usuario Invitado, o Caso Positivo vs Error de Datos) SÍ deben ser casos de prueba independientes.
+        10. Incluye cobertura completa de: Caminos felices (Positive), Casos de borde (Edge), Escenarios negativos / de error (Negative).
+        11. No inventes funcionalidades que no estén explícita o implícitamente descritas en la historia.
+        12. Utiliza redacción profesional, clara, específica y sin ambigüedades.
+
+        ════════════════════════════════════
+        📌 REGLA QA PARA EVITAR DUPLICADOS (Tip SB)
+        ════════════════════════════════════
+        Un caso de prueba debe validar un objetivo o flujo completo. 
+        NO separes los pasos de una misma intención funcional en pruebas distintas.
+        Ejemplo: Iniciar sesión, Acceder al perfil, Editar dirección y Guardar cambios corresponden a UN SOLO caso de prueba "[Ecommerce_SB] Editar dirección correctamente".
 
         ════════════════════════════════════
         🔎 REGLAS AVANZADAS PARA EL PASO A PASO (OBLIGATORIAS)
@@ -109,10 +117,10 @@ class AIService:
               - Qué elemento interactúa (botón, campo, selector, link)
            - Qué acción realiza
 
-        3. Descomposición obligatoria:
-           - No combines múltiples acciones en un solo paso.
+        3. Descomposición obligatoria de PASOS:
+           - No combines múltiples acciones en un solo paso del CSV.
            - Si una acción requiere datos, la acción debe indicarlo claramente.
-           - Navegación, ingreso de datos, confirmaciones y validaciones deben ir en pasos separados.
+           - Navegación, ingreso de datos, confirmaciones y validaciones deben ir en pasos (STEPS) separados, pero SIEMPRE bajo el mismo nombre de caso de prueba si pertenecen al mismo flujo.
 
         4. Contexto eCommerce SB:
            - Usa términos reales del dominio eCommerce (ej: carrito, checkout, medio de pago, despacho, resumen de compra).
@@ -121,13 +129,13 @@ class AIService:
         Ejemplo INCORRECTO:
         "ACCION": "Completar proceso de compra"
 
-        Ejemplo CORRECTO:
-        "ACCION":
-        "1. Acceder al carrito de compras
-         2. Presionar botón 'Ir a pagar'
-         3. Seleccionar dirección de despacho
-         4. Seleccionar medio de pago válido
-         5. Confirmar la orden de compra"
+        Ejemplo CORRECTO (Dentro de un mismo Caso de Prueba):
+        "STEP";"ACCION"
+        "1";"Acceder al carrito de compras"
+        "2";"Presionar botón 'Ir a pagar'"
+        "3";"Seleccionar dirección de despacho"
+        "4";"Seleccionar medio de pago válido"
+        "5";"Confirmar la orden de compra"
 
         Formatea el resultado ÚNICAMENTE como datos en formato CSV encerrados en un bloque de código ```csv ... ```.
         Usa EXACTAMENTE el carácter ";" (punto y coma) como separador de columnas. Encierra los valores relevantes entre comillas dobles si contienen comas o saltos de línea.
@@ -137,8 +145,10 @@ class AIService:
         Ejemplo:
         ```csv
         NOMBRE CASO PRUEBA;TIPO TC;SISTEMA AFECTADO;CREADO POR;PERSONA ASIGNADA;STEP;DESCRIPCION;ACCION;DATA;RESULTADO ESPERADO
-        "[Ecommerce_SB] Login exitoso";"Funcional";"eCommerce SB";"Ricardo Alberto Benavides Rozas";"Ricardo Alberto Benavides Rozas";"1";"Validar inicio de sesión exitoso";"1. Abrir web 2. Ingresar rut";"Credenciales válidas";"El usuario ingresa correctamente y ve el home"
+        "[Ecommerce_SB] Login exitoso";"Funcional";"eCommerce SB";"Ricardo Alberto Benavides Rozas";"Ricardo Alberto Benavides Rozas";"1";"Validar inicio de sesión";"Abrir web e ingresar RUT";"RUT válido";"Acceso exitoso al home"
+        "[Ecommerce_SB] Login exitoso";"Funcional";"eCommerce SB";"Ricardo Alberto Benavides Rozas";"Ricardo Alberto Benavides Rozas";"2";"Validar inicio de sesión";"Ingresar contraseña y presionar entrar";"Password válida";"Sesión iniciada correctamente"
         ```
+
         """
         return self._generate_content(prompt)
 
@@ -152,7 +162,7 @@ class AIService:
 
         INSTRUCCIONES DE CLASIFICACIÓN (Mapeo Lógico):
         1. Sección "¿Qué hice hoy?": Aquí debes poner todo lo que el usuario mencione como pasado o realizado hoy (ej: "hoy hice", "avancé", "terminé", "ayer", "participé").
-        2. Sección "¿Qué haré hoy?": Aquí debes poner lo que el usuario mencione como futuro o pendiente (ej: "mañana", "voy a", "haré", "quedó pendiente", "tengo que"). 
+        2. Sección "¿Qué haré mañana?": Aquí debes poner lo que el usuario mencione como futuro o pendiente (ej: "mañana", "voy a", "haré", "quedó pendiente", "tengo que"). 
            *Si el usuario no menciona nada para mañana, deja solo un punto que diga: "Continuar con las actividades del ciclo."
         3. Sección "¿Tengo impedimentos/bloqueantes?": Aquí va cualquier problema mencionado. 
            *Si el usuario dice "sin bloqueos", "sin impedimentos" o no menciona nada negativo, escribe obligatoriamente: "Ninguno en este momento."
@@ -167,8 +177,8 @@ class AIService:
         ¿Qué hice hoy?
         ● [Punto 1]
         ● [Punto 2]
-
-        ¿Qué haré hoy?
+        
+        ¿Qué haré mañana?
         ● [Punto 1]
 
         ¿Tengo impedimentos/bloqueantes?
