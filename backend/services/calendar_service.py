@@ -48,7 +48,7 @@ class CalendarService:
                     return datetime.datetime.combine(dt, datetime.time.min).replace(tzinfo=tz.tzlocal())
                 elif dt.tzinfo is None:
                     return dt.replace(tzinfo=tz.tzlocal())
-                return dt
+                return dt.astimezone(tz.tzlocal())
 
             for component in gcal.walk('vevent'):
                 summary = str(component.get('summary'))

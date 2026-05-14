@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from services.jira_service import JiraService
 from services.ai_service import AIService
 from services.calendar_service import CalendarService
 from services.evidence_service import EvidenceService
+from services.sales_validator_service import SalesValidatorService
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="JiraFlow QA Assistant API")
@@ -21,6 +22,7 @@ jira_svc = JiraService()
 ai_svc = AIService()
 cal_svc = CalendarService()
 evidence_svc = EvidenceService()
+sales_svc = SalesValidatorService()
 
 class DraftStory(BaseModel):
     text: str
@@ -133,6 +135,56 @@ def create_evidence_structure(req: EvidenceFolderRequest):
 def pick_directory():
     path = evidence_svc.pick_directory()
     return {"path": path}
+
+# --- SALES VALIDATION ENDPOINTS (LOCAL ONLY) ---
+
+@app.post("/sales/compare")
+async def compare_sales(
+    qa_txpos: UploadFile = File(...),
+    qa_det: Optional[UploadFile] = File(None),
+    qa_desc: Optional[UploadFile] = File(None),
+    qa_pago: Optional[UploadFile] = File(None),
+    qa_ant: Optional[UploadFile] = File(None),
+    prod_txpos: UploadFile = File(...),
+    prod_det: Optional[UploadFile] = File(None),
+    prod_desc: Optional[UploadFile] = File(None),
+    prod_pago: Optional[UploadFile] = File(None),
+    prod_ant: Optional[UploadFile] = File(None)
+):
+    import pandas as pd
+    import io
+    
+    async def load_df(file):
+        if not file: return None
+        content = await file.read()
+        if file.filename.endswith('.csv'):
+            return pd.read_csv(io.BytesIO(content))
+        elif file.filename.endswith(('.xls', '.xlsx')):
+            return pd.read_excel(io.BytesIO(content))
+        elif file.filename.endswith('.json'):
+            return pd.read_json(io.BytesIO(content))
+        return None
+
+    qa_files = {
+        'txpos': await load_df(qa_txpos),
+        'det_doc': await load_df(qa_det),
+        'descuento': await load_df(qa_desc),
+        'pago': await load_df(qa_pago),
+        'ant_vent': await load_df(qa_ant)
+    }
+
+    prod_files = {
+        'txpos': await load_df(prod_txpos),
+        'det_doc': await load_df(prod_det),
+        'descuento': await load_df(prod_desc),
+        'pago': await load_df(prod_pago),
+        'ant_vent': await load_df(prod_ant)
+    }
+
+    result = sales_svc.compare_environments(qa_files, prod_files)
+    if result["status"] == "error":
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
 
 if __name__ == "__main__":
     import uvicorn

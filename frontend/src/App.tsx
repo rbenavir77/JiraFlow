@@ -16,9 +16,11 @@ import {
   Copy,
   Archive,
   RefreshCcw,
-  PieChart
+  PieChart,
+  ShieldCheck
 } from 'lucide-react';
 import './index.css';
+import SalesValidator from './components/SalesValidator';
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -37,7 +39,7 @@ function App() {
   const [isGeneratingDaily, setIsGeneratingDaily] = useState(false);
 
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily' | 'evidence'>('jira');
+  const [activeTab, setActiveTab] = useState<'jira' | 'ai' | 'archive' | 'calendar' | 'daily' | 'evidence' | 'validator'>('jira');
   const [calendarSource, setCalendarSource] = useState<string>("");
   const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
@@ -62,6 +64,14 @@ function App() {
     if (activeTab === 'archive') fetchDoneTasks();
     if (activeTab === 'calendar') fetchMeetings();
   }, [activeTab]);
+
+  const formatHours = (hours: number) => {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  };
 
   const showNotification = (msg: string, type: 'success' | 'error' = 'success') => {
     setNotification({ msg, type });
@@ -175,7 +185,7 @@ function App() {
         const executed = p + f + b;
         const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
         const successRate = (p + f) > 0 ? (p / (p + f)) * 100 : 0;
-        
+
         const reportText = `\n\n📊 *Reporte de Avance QA*\n- *Casos Totales:* ${t}\n- *No Aplica (N/A):* ${na}\n- *Total Válido:* ${validTotal}\n\n✅ *Ejecutados:* ${executed} (${progress.toFixed(1)}%)\n  - Passed: ${p}\n  - Failed: ${f}\n  - Blocked: ${b}\n\n🎯 *Tasa de Éxito:* ${successRate.toFixed(1)}%\n🐞 *Defectos:* ${defects}`;
         finalStatus += reportText;
       }
@@ -263,7 +273,7 @@ function App() {
     if (lines[0].includes('NOMBRE CASO PRUEBA')) {
       startIndex = 1;
     }
-    
+
     const casesList = [];
     for (let i = startIndex; i < lines.length; i++) {
       const cols = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/(^"|"$)/g, ''));
@@ -279,7 +289,7 @@ function App() {
 
     const inProgressTask = tasks.find(t => t.status.toLowerCase().includes('en curso') || t.status.toLowerCase().includes('progress'));
     let initiative = "";
-    
+
     if (inProgressTask) {
       // Intentar extraer el prefijo entre corchetes, o usar el summary completo
       const match = inProgressTask.summary.match(/^\[(.*?)\]/);
@@ -315,7 +325,7 @@ function App() {
       .reduce((acc, m) => acc + (m.duration_hours || 0), 0);
 
     setTotalHours(Math.round(hours * 100) / 100);
-    showNotification(`Total de horas para hoy: ${hours}h`);
+    showNotification(`Total de horas para hoy: ${formatHours(hours)}`);
   };
 
   const sendMeetingsToJira = async () => {
@@ -398,7 +408,7 @@ function App() {
 
     // Intentar separar por los headers ### definidos en el prompt
     const sections = refinedStory.split(/### /);
-    
+
     if (sections.length <= 1) {
       return <div className="result-box">{refinedStory}</div>;
     }
@@ -417,20 +427,20 @@ function App() {
           <div style={{ fontWeight: 'bold', color: 'var(--accent-color)', marginBottom: '10px', fontSize: '0.95rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
             {title}
           </div>
-          <div 
-            style={{ 
-              background: 'rgba(255,255,255,0.03)', 
-              padding: '1.2rem', 
-              borderRadius: '8px', 
-              border: '1px solid var(--border-color)', 
-              fontSize: '0.95rem', 
-              lineHeight: '1.6', 
+          <div
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              padding: '1.2rem',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              fontSize: '0.95rem',
+              lineHeight: '1.6',
               boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               overflowWrap: 'break-word'
             }}
-            dangerouslySetInnerHTML={{ 
+            dangerouslySetInnerHTML={{
               __html: content
                 .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--accent-color)">$1</strong>')
                 .replace(/^- (.*)/gm, '<div style="display: flex; gap: 8px; margin-bottom: 4px;"><span>•</span><span>$1</span></div>')
@@ -473,6 +483,9 @@ function App() {
           </button>
           <button className={activeTab === 'evidence' ? '' : 'secondary'} onClick={() => setActiveTab('evidence')}>
             <FileText size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Documentación
+          </button>
+          <button className={activeTab === 'validator' ? '' : 'secondary'} onClick={() => setActiveTab('validator')}>
+            <ShieldCheck size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Comparador de BD
           </button>
         </nav>
       </header>
@@ -685,7 +698,7 @@ function App() {
               <div className="glass-panel" style={{ padding: '1rem', marginBottom: '1.5rem', borderLeft: '4px solid var(--accent-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(88, 166, 255, 0.05)' }}>
                 <div>
                   <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Total de horas calculadas para hoy:</span>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-color)' }}>{totalHours} horas</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-color)' }}>{formatHours(totalHours)}</div>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'right' }}>
                   Esto se enviará como "Estimación Original" <br /> a tu tarea en curso en Jira.
@@ -700,7 +713,7 @@ function App() {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                       {new Date(event.start.dateTime || event.start.date).toLocaleString('es-CL')}
                       <span style={{ marginLeft: '10px', color: 'var(--accent-color)' }}>
-                        ({event.duration_hours}h)
+                        ({formatHours(event.duration_hours)})
                       </span>
                     </div>
                   </div>
@@ -720,34 +733,34 @@ function App() {
           <div className="glass-panel card">
             <h2><FileText size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Generador de Evidencias</h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Genera automáticamente un documento Word con las capturas de pantalla y videos de tus pruebas. 
+              Genera automáticamente un documento Word con las capturas de pantalla y videos de tus pruebas.
               El sistema buscará subcarpetas (una por cada Caso de Prueba) y procesará imágenes y videos.
             </p>
-            
+
             <div style={{ marginBottom: '2rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Ruta local de la carpeta de evidencias:
               </label>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Ej: C:\Users\Nombre\Documents\Evidencias\Release_1"
                   value={evidencePath}
                   onChange={(e) => setEvidencePath(e.target.value)}
-                  style={{ 
-                    flex: '1 1 300px', 
+                  style={{
+                    flex: '1 1 300px',
                     minWidth: '200px',
-                    background: 'rgba(0,0,0,0.2)', 
-                    border: '1px solid var(--border-color)', 
-                    borderRadius: '6px', 
-                    padding: '0.6rem', 
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    padding: '0.6rem',
                     color: 'white',
                     fontSize: '0.9rem'
                   }}
                 />
                 {evidencePath && (
-                  <button 
-                    className="secondary" 
+                  <button
+                    className="secondary"
                     onClick={() => setEvidencePath("")}
                     style={{ padding: '0.6rem' }}
                     title="Limpiar ruta"
@@ -755,8 +768,8 @@ function App() {
                     ✕
                   </button>
                 )}
-                <button 
-                  className="secondary" 
+                <button
+                  className="secondary"
                   onClick={async () => {
                     try {
                       const res = await axios.get(`${API_BASE}/evidence/pick-dir`);
@@ -795,6 +808,12 @@ function App() {
         </main>
       )}
 
+      {activeTab === 'validator' && (
+        <main>
+          <SalesValidator showNotification={showNotification} />
+        </main>
+      )}
+
       {activeTab === 'daily' && (
         <main className="grid">
           <div className="glass-panel card">
@@ -810,18 +829,18 @@ function App() {
               style={{ minHeight: '120px' }}
             />
             <hr style={{ margin: '1.5rem 0', borderColor: 'var(--border-color)' }} />
-            
+
             <h4 style={{ marginBottom: '1rem', color: 'var(--accent-color)' }}><PieChart size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Métricas de Ejecución (Opcional)</h4>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '1rem' }}>
               Si llenas estos campos, se calculará el % de avance y se incluirá en el reporte de Daily.
             </p>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Casos Totales</label>
-                <input 
-                  type="number" 
-                  value={metricsTotal} 
+                <input
+                  type="number"
+                  value={metricsTotal}
                   onChange={(e) => setMetricsTotal(e.target.value ? Number(e.target.value) : "")}
                   placeholder="Ej: 20"
                   style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
@@ -830,9 +849,9 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#22c55e' }}>Passed</label>
-                  <input 
-                    type="number" 
-                    value={metricsPassed} 
+                  <input
+                    type="number"
+                    value={metricsPassed}
                     onChange={(e) => setMetricsPassed(e.target.value ? Number(e.target.value) : "")}
                     placeholder="0"
                     style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
@@ -840,9 +859,9 @@ function App() {
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#ef4444' }}>Failed</label>
-                  <input 
-                    type="number" 
-                    value={metricsFailed} 
+                  <input
+                    type="number"
+                    value={metricsFailed}
                     onChange={(e) => setMetricsFailed(e.target.value ? Number(e.target.value) : "")}
                     placeholder="0"
                     style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
@@ -852,9 +871,9 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#f59e0b' }}>Blocked</label>
-                  <input 
-                    type="number" 
-                    value={metricsBlocked} 
+                  <input
+                    type="number"
+                    value={metricsBlocked}
                     onChange={(e) => setMetricsBlocked(e.target.value ? Number(e.target.value) : "")}
                     placeholder="0"
                     style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
@@ -862,9 +881,9 @@ function App() {
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>N/A</label>
-                  <input 
-                    type="number" 
-                    value={metricsNA} 
+                  <input
+                    type="number"
+                    value={metricsNA}
                     onChange={(e) => setMetricsNA(e.target.value ? Number(e.target.value) : "")}
                     placeholder="0"
                     style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
@@ -873,25 +892,25 @@ function App() {
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--accent-color)' }}>Bugs Encontrados</label>
-                <input 
-                  type="number" 
-                  value={metricsDefects} 
+                <input
+                  type="number"
+                  value={metricsDefects}
                   onChange={(e) => setMetricsDefects(e.target.value ? Number(e.target.value) : "")}
                   placeholder="0"
                   style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--accent-color)', borderRadius: '6px', padding: '0.6rem', color: 'white' }}
                 />
               </div>
             </div>
-            
+
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <button onClick={generateDailyStatus} disabled={isGeneratingDaily || !draftDaily}>
                 {isGeneratingDaily ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />}
                 Generar Daily
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setMetricsTotal(""); setMetricsPassed(""); setMetricsFailed(""); setMetricsBlocked(""); setMetricsNA(""); setMetricsDefects("");
-                }} 
+                }}
                 className="secondary"
               >
                 Limpiar Métricas
@@ -937,7 +956,7 @@ function App() {
                   const executed = p + f + b;
                   const progress = validTotal > 0 ? (executed / validTotal) * 100 : 0;
                   const successRate = (p + f) > 0 ? (p / (p + f)) * 100 : 0;
-                  
+
                   const text = `📊 *Reporte de Avance QA*\n- *Casos Totales:* ${t}\n- *No Aplica (N/A):* ${na}\n- *Total Válido:* ${validTotal}\n\n✅ *Ejecutados:* ${executed} (${progress.toFixed(1)}%)\n  - Passed: ${p}\n  - Failed: ${f}\n  - Blocked: ${b}\n\n🎯 *Tasa de Éxito:* ${successRate.toFixed(1)}%\n🐞 *Defectos:* ${defects}`;
                   navigator.clipboard.writeText(text);
                   showNotification("¡Métricas copiadas al portapapeles para Jira!");
