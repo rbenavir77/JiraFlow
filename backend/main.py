@@ -157,13 +157,36 @@ async def compare_sales(
     async def load_df(file):
         if not file: return None
         content = await file.read()
-        if file.filename.endswith('.csv'):
-            return pd.read_csv(io.BytesIO(content))
-        elif file.filename.endswith(('.xls', '.xlsx')):
-            return pd.read_excel(io.BytesIO(content))
-        elif file.filename.endswith('.json'):
-            return pd.read_json(io.BytesIO(content))
-        return None
+        if not content: return None
+        
+        try:
+            if file.filename.endswith('.csv'):
+                # Intentar leer con ; y , por si acaso
+                try:
+                    return pd.read_csv(io.BytesIO(content), sep=';')
+                except:
+                    return pd.read_csv(io.BytesIO(content), sep=',')
+            elif file.filename.endswith(('.xls', '.xlsx')):
+                return pd.read_excel(io.BytesIO(content))
+            elif file.filename.endswith('.json'):
+                import json
+                raw_data = json.loads(content.decode('utf-8'))
+                
+                # Si es un dict, verificar si los datos están anidados bajo una sola llave
+                if isinstance(raw_data, dict):
+                    # Si el dict tiene una sola llave y esa llave es otro dict o lista, entramos
+                    if len(raw_data) == 1:
+                        key = list(raw_data.keys())[0]
+                        if isinstance(raw_data[key], (dict, list)):
+                            raw_data = raw_data[key]
+                
+                if isinstance(raw_data, dict):
+                    return pd.DataFrame([raw_data])
+                return pd.DataFrame(raw_data)
+            return None
+        except Exception as e:
+            print(f"Error loading {file.filename}: {e}")
+            return None
 
     qa_files = {
         'txpos': await load_df(qa_txpos),

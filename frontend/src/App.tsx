@@ -17,7 +17,9 @@ import {
   Archive,
   RefreshCcw,
   PieChart,
-  ShieldCheck
+  ShieldCheck,
+  Menu,
+  X
 } from 'lucide-react';
 import './index.css';
 import SalesValidator from './components/SalesValidator';
@@ -58,6 +60,7 @@ function App() {
   const [totalHours, setTotalHours] = useState<number>(0);
   const [isSendingToJira, setIsSendingToJira] = useState(false);
   const [isRefreshingCalendar, setIsRefreshingCalendar] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'jira') fetchTasks();
@@ -463,29 +466,64 @@ function App() {
 
       <header>
         <div className="logo">
-          <Zap size={28} /> JiraFlow QA Assistant
+          <div className="logo-icon">
+            <Zap size={24} fill="white" />
+          </div>
+          <div className="logo-text">
+            <div className="brand-name">JiraFlow</div>
+            <div className="slogan">QA Assistant</div>
+          </div>
         </div>
-        <nav style={{ display: 'flex', gap: '1rem' }}>
-          <button className={activeTab === 'jira' ? '' : 'secondary'} onClick={() => setActiveTab('jira')}>
-            <LayoutDashboard size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Asignaciones
+        
+        <button 
+          className="mobile-menu-btn" 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
+        <nav className={`nav-container ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+          <button 
+            className={`nav-button ${activeTab === 'jira' ? 'active' : ''}`} 
+            onClick={() => { setActiveTab('jira'); setIsMobileMenuOpen(false); }}
+          >
+            <LayoutDashboard size={16} /> Asignaciones
           </button>
-          <button className={activeTab === 'ai' ? '' : 'secondary'} onClick={() => setActiveTab('ai')}>
-            <BrainCircuit size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Refinador AI
+          <button 
+            className={`nav-button ${activeTab === 'ai' ? 'active' : ''}`} 
+            onClick={() => { setActiveTab('ai'); setIsMobileMenuOpen(false); }}
+          >
+            <BrainCircuit size={16} /> Refinador AI
           </button>
-          <button className={activeTab === 'archive' ? '' : 'secondary'} onClick={() => setActiveTab('archive')}>
-            <Archive size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Historial
+          <button 
+            className={`nav-button ${activeTab === 'archive' ? 'active' : ''}`} 
+            onClick={() => { setActiveTab('archive'); setIsMobileMenuOpen(false); }}
+          >
+            <Archive size={16} /> Historial
           </button>
-          <button className={activeTab === 'calendar' ? '' : 'secondary'} onClick={() => setActiveTab('calendar')}>
-            <Calendar size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Calendario
+          <button 
+            className={`nav-button ${activeTab === 'calendar' ? 'active' : ''}`} 
+            onClick={() => { setActiveTab('calendar'); setIsMobileMenuOpen(false); }}
+          >
+            <Calendar size={16} /> Calendario
           </button>
-          <button className={activeTab === 'daily' ? '' : 'secondary'} onClick={() => setActiveTab('daily')}>
-            <MessageSquare size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Daily Status
+          <button 
+            className={`nav-button ${activeTab === 'daily' ? 'active' : ''}`} 
+            onClick={() => { setActiveTab('daily'); setIsMobileMenuOpen(false); }}
+          >
+            <MessageSquare size={16} /> Daily Status
           </button>
-          <button className={activeTab === 'evidence' ? '' : 'secondary'} onClick={() => setActiveTab('evidence')}>
-            <FileText size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Documentación
+          <button 
+            className={`nav-button ${activeTab === 'evidence' ? 'active' : ''}`} 
+            onClick={() => { setActiveTab('evidence'); setIsMobileMenuOpen(false); }}
+          >
+            <FileText size={16} /> Documentación
           </button>
-          <button className={activeTab === 'validator' ? '' : 'secondary'} onClick={() => setActiveTab('validator')}>
-            <ShieldCheck size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} /> Comparador de BD
+          <button 
+            className={`nav-button ${activeTab === 'validator' ? 'active' : ''}`} 
+            onClick={() => { setActiveTab('validator'); setIsMobileMenuOpen(false); }}
+          >
+            <ShieldCheck size={16} /> Comparador de BD
           </button>
         </nav>
       </header>
@@ -511,7 +549,7 @@ function App() {
                     )}
                     {task.confluence_url && (
                       <a href={task.confluence_url} target="_blank" rel="noopener noreferrer" className="badge" style={{ marginLeft: '8px', background: '#0052cc', color: 'white', textDecoration: 'none' }} title="Documentación en Confluence">
-                        📘 Docs
+                        📘 Confluence
                       </a>
                     )}
                     <div style={{ marginTop: '4px' }}>{task.summary}</div>
@@ -572,7 +610,7 @@ function App() {
                     )}
                     {task.confluence_url && (
                       <a href={task.confluence_url} target="_blank" rel="noopener noreferrer" className="badge" style={{ marginLeft: '8px', background: '#0052cc', color: 'white', textDecoration: 'none' }} title="Documentación en Confluence">
-                        📘 Docs
+                        📘 Confluence
                       </a>
                     )}
                     <div style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>{task.summary}</div>
@@ -671,7 +709,7 @@ function App() {
       {activeTab === 'calendar' && (
         <main>
           <div className="glass-panel card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div className="calendar-header">
               <div>
                 <h2>Próximas Reuniones</h2>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
@@ -679,15 +717,15 @@ function App() {
                   {calendarSource !== 'URL' && " (Configura CALENDAR_URL en .env para tiempo real)"}
                 </p>
               </div>
-              <div>
+              <div className="calendar-actions">
                 <button onClick={fetchMeetings} className="secondary" disabled={isRefreshingCalendar} title="Sincronizar calendario ahora">
                   {isRefreshingCalendar ? <Loader2 size={16} className="spin" /> : <RefreshCcw size={16} style={{ marginRight: '6px' }} />}
                   Actualizar
                 </button>
-                <button onClick={sumTodayHours} className="secondary" style={{ marginLeft: '0.5rem' }}>
+                <button onClick={sumTodayHours} className="secondary">
                   <ClipboardCheck size={16} style={{ marginRight: '6px' }} /> Calcular Horas Hoy
                 </button>
-                <button onClick={sendMeetingsToJira} disabled={isSendingToJira || totalHours <= 0} style={{ marginLeft: '0.5rem' }}>
+                <button onClick={sendMeetingsToJira} disabled={isSendingToJira || totalHours <= 0}>
                   {isSendingToJira ? <Loader2 size={16} className="spin" /> : <PlusCircle size={16} style={{ marginRight: '6px' }} />}
                   Enviar a Jira
                 </button>
@@ -695,12 +733,12 @@ function App() {
             </div>
 
             {totalHours > 0 && (
-              <div className="glass-panel" style={{ padding: '1rem', marginBottom: '1.5rem', borderLeft: '4px solid var(--accent-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(88, 166, 255, 0.05)' }}>
+              <div className="glass-panel calendar-summary-panel">
                 <div>
                   <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Total de horas calculadas para hoy:</span>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-color)' }}>{formatHours(totalHours)}</div>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                <div className="calendar-summary-note">
                   Esto se enviará como "Estimación Original" <br /> a tu tarea en curso en Jira.
                 </div>
               </div>

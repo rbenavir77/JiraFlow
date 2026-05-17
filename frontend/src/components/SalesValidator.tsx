@@ -207,22 +207,28 @@ const SalesValidator: React.FC<ValidatorProps> = ({ showNotification }) => {
           {renderFileInputs('prod')}
         </div>
 
-        <button 
-          onClick={handleCompare} 
-          disabled={isLoading} 
-          className={!qaFiles.txpos || !prodFiles.txpos ? 'secondary' : ''}
-          style={{ 
-            width: '100%', 
-            padding: '1.2rem', 
-            fontSize: '1.1rem', 
-            fontWeight: 'bold', 
-            background: (!qaFiles.txpos || !prodFiles.txpos) ? 'rgba(255,255,255,0.05)' : 'var(--accent-color)',
-            boxShadow: (!qaFiles.txpos || !prodFiles.txpos) ? 'none' : '0 4px 15px rgba(88, 166, 255, 0.3)'
-          }}
-        >
-          {isLoading ? <Loader2 className="spin" size={24} /> : <CheckCircle2 size={24} style={{ marginRight: '12px' }} />}
-          EJECUTAR AUDITORÍA COMPARATIVA
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+          <button 
+            onClick={handleCompare} 
+            disabled={isLoading} 
+            className={!qaFiles.txpos || !prodFiles.txpos ? 'secondary' : ''}
+            style={{ 
+              padding: '0.8rem 2rem', 
+              fontSize: '1rem', 
+              fontWeight: '600', 
+              background: (!qaFiles.txpos || !prodFiles.txpos) ? 'rgba(255,255,255,0.05)' : 'var(--accent-color)',
+              boxShadow: (!qaFiles.txpos || !prodFiles.txpos) ? 'none' : '0 4px 12px rgba(88, 166, 255, 0.2)',
+              borderRadius: '30px',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}
+          >
+            {isLoading ? <Loader2 className="spin" size={20} /> : <CheckCircle2 size={20} />}
+            EJECUTAR AUDITORÍA COMPARATIVA
+          </button>
+        </div>
 
         {result && (
           <div className="result-section" style={{ marginTop: '3rem', animation: 'fadeIn 0.5s ease-out' }}>
