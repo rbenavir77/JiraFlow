@@ -51,9 +51,9 @@
 ## 🛠️ Stack Tecnológico
 
 * **Frontend:** React (TypeScript), Lucide Icons, Vanilla CSS con variables de diseño personalizadas.
-* **Backend:** FastAPI (Python), Uvicorn.
+* **Backend:** FastAPI (Python), Uvicorn, OpenCV (procesamiento de video), python-docx (reportes Word).
 * **Procesamiento de Datos:** Pandas, OpenPyXL, Decimal Engine (para precisión contable absoluta).
-* **AI:** Google Gemini API Integration.
+* **AI:** OpenAI API Integration (`gpt-4o-mini`).
 
 ---
 
@@ -86,13 +86,25 @@ cd JiraFlow
    ```bash
    pip install -r requirements.txt
    ```
-4. Crea un archivo `.env` en la raíz de la carpeta `backend` basándote en `.env.example` y completa tus credenciales:
+4. Crea un archivo `.env` en la raíz de la carpeta `backend` basándote en `.env.example` y completa tus credenciales reales:
    ```env
+   # Configuración de Jira
    JIRA_URL=https://tu-dominio.atlassian.net
-   JIRA_USER=tu-email@empresa.com
-   JIRA_TOKEN=tu-api-token-jira
-   GEMINI_API_KEY=tu-api-key-gemini
-   CALENDAR_URL=http://enlace-a-tu-calendario.ics (Opcional)
+   JIRA_EMAIL=tu-email@empresa.com
+   JIRA_API_TOKEN=tu-api-token-jira
+   JIRA_PROJECT_KEY=TDECOM
+
+   # Configuración de IA (OpenAI)
+   OPENAI_API_KEY=tu-api-key-openai
+   OPENAI_MODEL=gpt-4o-mini
+
+   # Configuración de Calendario
+   CALENDAR_URL=http://enlace-a-tu-calendario.ics (Opcional - Si no se define, el backend leerá el archivo 'calendar.ics' local)
+   GOOGLE_CALENDAR_CREDENTIALS=credentials.json (Opcional)
+
+   # Configuración de Correo (Notificaciones)
+   GMAIL_USER=tu-email@empresa.com (Opcional)
+   GMAIL_PASSWORD=tu-contraseña-aplicacion-gmail (Opcional)
    ```
 5. Inicia el servidor de desarrollo:
    ```bash
