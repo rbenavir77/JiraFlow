@@ -20,6 +20,7 @@
 ### 2. 🧠 Copiloto AI Integrado
 * **Refinamiento de Historias:** Estructura historias de usuario bajo el estándar ágil óptimo.
 * **Generador de Casos de Prueba:** Diseña suites de pruebas detalladas a partir del análisis de historias de usuario.
+* **Exportación Masiva para Jira:** Permite exportar los casos de prueba generados en formato **CSV formateado y estructurado** listo para importar masivamente en Jira (Zephyr/Xray), mapeando campos clave como nombre, pasos y resultados esperados.
 * **Reporte Diario (Daily Status):** Compila reportes clasificados entre tareas completadas y planificación futura de forma profesional.
 
 ### 3. ⚖️ Comparador de BD (Auditoría Contable Local)
@@ -29,15 +30,21 @@
 * **Auto-Aplanado de JSON:** Capacidad inteligente para extraer datos de estructuras de JSON anidadas o complejas de forma automatizada.
 * **100% Seguro y Privado:** Procesamiento local en memoria; no requiere conexión externa a bases de datos ni guarda información confidencial fuera de tu entorno.
 
-### 4. 📅 Sincronizador de Calendario & Horas
+### 4. 📂 Documentador de Evidencias de Pruebas
+* **Compilación de Reportes Word y HTML:** Diseña documentos de certificación formal en formatos **DOCX (Word)** y **HTML**.
+* **Generación basada en Videos y Capturas:** Procesa las grabaciones de video previas hechas durante tus ejecuciones de pruebas de QA para extraer las secuencias y armar el reporte de evidencias detalladamente.
+* **Estructura de Carpetas Automática:** Crea de forma automatizada la jerarquía de carpetas local correspondiente a la iniciativa y casos de prueba para mantener un orden riguroso.
+
+### 5. 📅 Sincronizador de Calendario & Horas
 * **Cálculo Automático:** Extrae tus reuniones de hoy y calcula el total de horas automáticamente.
 * **Formato Humano Legible:** Convierte horas decimales (ej. `1.67h`) a formatos claros e intuitivos (ej. `1h 40m`) tanto en reportes como en listados.
 * **Envío a Jira:** Registra tus horas calculadas directamente como estimación original en tus tareas activas de Jira.
 
-### 5. 📱 Interfaz Premium y Responsiva
+### 6. 📱 Interfaz Premium y Responsiva
 * **Navegación Segmentada:** Barra superior unificada con efectos visuales *glassmorphism* y transiciones sutiles.
 * **Menú Hamburguesa Móvil:** Menú dinámico que se oculta en pantallas de escritorio y se activa con animaciones fluidas (`fadeIn`) en dispositivos móviles.
 * **Layout Fluido:** Soporte completo de auto-ajuste para pantallas intermedias (tablets y laptops pequeñas) mediante grids dinámicos.
+
 
 ---
 
