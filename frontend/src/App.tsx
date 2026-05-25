@@ -385,11 +385,12 @@ function App() {
       const cols = line.split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/(^"|"$)/g, ''));
 
       if (cols.length >= 10) {
+        const stepNum = cols[5];
         elements.push(
           <div key={i} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '1rem', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
             <div style={{ fontWeight: 'bold', color: 'var(--accent-color)', marginBottom: '12px', fontSize: '1.05rem' }}>{cols[0]}</div>
             <div style={{ marginBottom: '6px' }}><strong>Descripción:</strong> {cols[6]}</div>
-            <div style={{ marginBottom: '6px' }}><strong>Pasos:</strong> {cols[7]}</div>
+            <div style={{ marginBottom: '6px' }}><strong>Pasos:</strong> Paso {stepNum}: {cols[7]}</div>
             <div style={{ marginBottom: '4px' }}><strong>Re. Esperado:</strong> {cols[9]}</div>
           </div>
         );
