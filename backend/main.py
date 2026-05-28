@@ -57,12 +57,24 @@ def get_jira_tasks(assignee: str = "712020:2c8f81bb-28b8-40a6-88fd-14186d720082"
 def get_jira_done_tasks(assignee: str = "712020:2c8f81bb-28b8-40a6-88fd-14186d720082"):
     return jira_svc.get_done_tasks(assignee)
 
+@app.get("/jira/defects")
+def get_jira_defects(assignee: str = "712020:2c8f81bb-28b8-40a6-88fd-14186d720082"):
+    return jira_svc.get_my_defects(assignee)
+
 @app.get("/jira/issue/{issue_key}")
 def get_issue_detail(issue_key: str):
     result = jira_svc.get_issue_detail(issue_key)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+@app.get("/jira/task/{issue_key}/subtasks-time")
+def get_subtasks_time(issue_key: str):
+    result = jira_svc.get_subtasks_time(issue_key)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
 
 @app.post("/jira/subtasks")
 def create_subtasks(req: SubtaskRequest):
@@ -83,21 +95,21 @@ def create_meeting_subtask(req: MeetingSubtaskRequest):
 @app.post("/ai/refine")
 def refine_story(story: DraftStory):
     refined = ai_svc.refine_story(story.text)
-    if not refined or "Error" in refined:
+    if not refined or refined.startswith("Error de IA"):
         raise HTTPException(status_code=500, detail=refined)
     return {"refined_story": refined}
 
 @app.post("/ai/test-cases")
 def generate_tests(story: DraftStory):
     tests = ai_svc.generate_test_cases(story.text)
-    if not tests or "Error" in tests:
+    if not tests or tests.startswith("Error de IA"):
         raise HTTPException(status_code=500, detail=tests)
     return {"test_cases": tests}
 
 @app.post("/ai/daily-status")
 def generate_daily(story: DraftStory):
     status = ai_svc.generate_daily_status(story.text)
-    if not status or "Error" in status:
+    if not status or status.startswith("Error de IA"):
         raise HTTPException(status_code=500, detail=status)
     return {"daily_status": status}
 

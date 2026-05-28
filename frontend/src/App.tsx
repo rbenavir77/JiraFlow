@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import {
   FileText,
   LayoutDashboard,
@@ -19,7 +20,8 @@ import {
   PieChart,
   ShieldCheck,
   Menu,
-  X
+  X,
+  FileSpreadsheet
 } from 'lucide-react';
 import './index.css';
 import SalesValidator from './components/SalesValidator';
@@ -62,11 +64,74 @@ function App() {
   const [isRefreshingCalendar, setIsRefreshingCalendar] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Subtasks Time Calculator State
+  const [isCalculatingSubtasks, setIsCalculatingSubtasks] = useState(false);
+  const [subtasksTimeData, setSubtasksTimeData] = useState<{
+    parent_key: string,
+    total_seconds: number,
+    total_hours: number,
+    total_days: number,
+    readable_total: string,
+    subtasks: any[]
+  } | null>(null);
+  const [subtasksCalculatorKey, setSubtasksCalculatorKey] = useState<string>("");
+  const [isSubtasksDesgloseOpen, setIsSubtasksDesgloseOpen] = useState(false);
+
+  // Historial Pagination and Search State
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+
+  // Historial Defects Sub-tab State
+  const [historyTab, setHistoryTab] = useState<'tasks' | 'defects'>('tasks');
+  const [defects, setDefects] = useState<any[]>([]);
+  const [isFetchingDefects, setIsFetchingDefects] = useState(false);
+
   useEffect(() => {
     if (activeTab === 'jira') fetchTasks();
-    if (activeTab === 'archive') fetchDoneTasks();
+    if (activeTab === 'archive') {
+      fetchDoneTasks();
+      setHistoryPage(1);
+      setHistorySearch("");
+    }
     if (activeTab === 'calendar') fetchMeetings();
+    if (activeTab === 'daily') {
+      const loadDailyTasks = async () => {
+        let currentTasks = tasks;
+        if (tasks.length === 0) {
+          try {
+            const res = await axios.get(`${API_BASE}/jira/tasks`);
+            setTasks(res.data);
+            currentTasks = res.data;
+          } catch (e) {
+            console.error("Error al pre-cargar asignaciones", e);
+          }
+        }
+        // Intentar buscar la tarea en curso
+        const inProgressTask = currentTasks.find(t => t.status.toLowerCase().includes('en curso') || t.status.toLowerCase().includes('progress'));
+        if (inProgressTask) {
+          setSubtasksCalculatorKey(inProgressTask.key);
+          fetchSubtasksTime(inProgressTask.key);
+        }
+      };
+      loadDailyTasks();
+    }
   }, [activeTab]);
+
+  const fetchSubtasksTime = async (key: string) => {
+    if (!key) return;
+    setIsCalculatingSubtasks(true);
+    try {
+      const res = await axios.get(`${API_BASE}/jira/task/${key}/subtasks-time`);
+      setSubtasksTimeData(res.data);
+      showNotification(`✅ Estimaciones sumadas con éxito para ${key}.`);
+    } catch (e) {
+      showNotification("No se pudieron cargar las estimaciones de subtareas.", 'error');
+    } finally {
+      setIsCalculatingSubtasks(false);
+    }
+  };
+
 
   const formatHours = (hours: number) => {
     const h = Math.floor(hours);
@@ -96,6 +161,18 @@ function App() {
       setDoneTasks(res.data);
     } catch (e) {
       showNotification("No se pudieron cargar las tareas finalizadas.", 'error');
+    }
+  };
+
+  const fetchDefects = async () => {
+    setIsFetchingDefects(true);
+    try {
+      const res = await axios.get(`${API_BASE}/jira/defects`);
+      setDefects(res.data);
+    } catch (e) {
+      showNotification("No se pudieron cargar los defectos de Jira.", 'error');
+    } finally {
+      setIsFetchingDefects(false);
     }
   };
 
@@ -222,6 +299,78 @@ function App() {
       showNotification(errorMsg, 'error');
     }
     setGeneratingFormat(null);
+  };
+
+  // ── Exportar Iniciativas Finalizadas a Excel ──────────────────────────────
+  const exportDoneTasksToExcel = () => {
+    if (!doneTasks || doneTasks.length === 0) {
+      showNotification('No hay iniciativas finalizadas para exportar.', 'error');
+      return;
+    }
+    const rows = doneTasks.map((t: any) => ({
+      'Clave': t.key,
+      'Resumen / Iniciativa': t.summary,
+      'Estado': t.status,
+      'Fecha Asignación': t.created || '',
+      'Fecha Término': t.resolved || '',
+      'TQA Vinculado': t.tqa || '',
+      'URL Jira': `https://comunidadesb.atlassian.net/browse/${t.key}`
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Ancho de columnas
+    ws['!cols'] = [
+      { wch: 14 },  // Clave
+      { wch: 60 },  // Resumen
+      { wch: 20 },  // Estado
+      { wch: 18 },  // Fecha Asignación
+      { wch: 18 },  // Fecha Término
+      { wch: 16 },  // TQA
+      { wch: 55 }   // URL
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Iniciativas Finalizadas');
+    const fecha = new Date().toLocaleDateString('es-CL').replace(/\//g, '-');
+    XLSX.writeFile(wb, `iniciativas_finalizadas_${fecha}.xlsx`);
+    showNotification('✅ Excel de iniciativas exportado con éxito.');
+  };
+
+  // ── Exportar Defectos a Excel ─────────────────────────────────────────────
+  const exportDefectsToExcel = () => {
+    if (!defects || defects.length === 0) {
+      showNotification('No hay defectos para exportar. Carga primero la pestaña "Mis Defectos".', 'error');
+      return;
+    }
+    const rows = defects.map((t: any) => ({
+      'Clave': t.key,
+      'Resumen / Defecto': t.summary,
+      'Prioridad': t.priority || '',
+      'Estado': t.status,
+      'Fecha Creación': t.created || '',
+      'Fecha Cierre': t.resolved || '',
+      'URL Jira': `https://comunidadesb.atlassian.net/browse/${t.key}`
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Ancho de columnas
+    ws['!cols'] = [
+      { wch: 14 },  // Clave
+      { wch: 60 },  // Resumen
+      { wch: 14 },  // Prioridad
+      { wch: 20 },  // Estado
+      { wch: 18 },  // Fecha Creación
+      { wch: 18 },  // Fecha Cierre
+      { wch: 55 }   // URL
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Mis Defectos');
+    const fecha = new Date().toLocaleDateString('es-CL').replace(/\//g, '-');
+    XLSX.writeFile(wb, `mis_defectos_${fecha}.xlsx`);
+    showNotification('✅ Excel de defectos exportado con éxito.');
   };
 
   const exportToCSV = () => {
@@ -554,6 +703,13 @@ function App() {
                       </a>
                     )}
                     <div style={{ marginTop: '4px' }}>{task.summary}</div>
+                    {task.created && (
+                      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
+                        <span style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          📅 <strong>Asignación:</strong> {task.created}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
                     <span className="badge badge-todo">{task.status}</span>
@@ -590,45 +746,354 @@ function App() {
         </main>
       )}
 
-      {activeTab === 'archive' && (
-        <main>
-          <div className="glass-panel card">
-            <h2>Historial (Finalizadas)</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Tus últimos tickets que ya están en estado "Done". (Mostrando hasta 50 recientes).
-            </p>
-            <div className="issue-list">
-              {doneTasks.length > 0 ? doneTasks.map(task => (
-                <div key={task.key} className="issue-item">
-                  <div>
-                    <a href={`https://comunidadesb.atlassian.net/browse/${task.key}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-secondary)', fontWeight: 'bold', textDecoration: 'none' }}>
-                      {task.key}
-                    </a>
-                    {task.tqa && (
-                      <a href={`https://comunidadesb.atlassian.net/browse/${task.tqa}`} target="_blank" rel="noopener noreferrer" className="badge badge-done" style={{ marginLeft: '8px', background: 'var(--success-color)', color: 'white', textDecoration: 'none' }} title="Ticket TQA vinculado">
-                        {task.tqa}
-                      </a>
-                    )}
-                    {task.confluence_url && (
-                      <a href={task.confluence_url} target="_blank" rel="noopener noreferrer" className="badge" style={{ marginLeft: '8px', background: '#0052cc', color: 'white', textDecoration: 'none' }} title="Documentación en Confluence">
-                        📘 Confluence
-                      </a>
-                    )}
-                    <div style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>{task.summary}</div>
+      {activeTab === 'archive' && (() => {
+        const getPriorityBadgeStyle = (priority: string) => {
+          switch (priority?.toLowerCase()) {
+            case 'highest':
+            case 'critical':
+            case 'high':
+            case 'alta':
+            case 'crítico':
+            case 'crítica':
+              return { background: 'rgba(248, 81, 73, 0.15)', color: '#ff7b72', border: '1px solid rgba(248, 81, 73, 0.3)' };
+            case 'medium':
+            case 'media':
+            case 'normal':
+              return { background: 'rgba(210, 153, 34, 0.15)', color: '#d29922', border: '1px solid rgba(210, 153, 34, 0.3)' };
+            default:
+              return { background: 'rgba(88, 166, 255, 0.15)', color: '#58a6ff', border: '1px solid rgba(88, 166, 255, 0.3)' };
+          }
+        };
+
+        const getStatusBadgeStyle = (status: string) => {
+          const s = status?.toLowerCase() || '';
+          // CERRADO / RESUELTO → Verde
+          if (
+            s.includes('done') || s.includes('resolved') || s.includes('closed') ||
+            s.includes('finalizado') || s.includes('cerrado') || s.includes('fixed') ||
+            s.includes('listo') || s.includes('completado') || s.includes('complete')
+          ) {
+            return {
+              background: 'rgba(63, 185, 80, 0.18)',
+              color: '#4caf6e',
+              border: '1px solid rgba(63, 185, 80, 0.45)',
+              fontWeight: '600'
+            };
+          }
+          // DIFERIDO / POSTPUESTO → Amarillo
+          if (
+            s.includes('deferred') || s.includes('diferido') ||
+            s.includes('postponed') || s.includes('postpuesto') || s.includes('on hold')
+          ) {
+            return {
+              background: 'rgba(210, 153, 34, 0.18)',
+              color: '#e3ab2b',
+              border: '1px solid rgba(210, 153, 34, 0.45)',
+              fontWeight: '600'
+            };
+          }
+          // ABIERTO / EN PROGRESO / ACTIVO → Rojo
+          return {
+            background: 'rgba(248, 81, 73, 0.18)',
+            color: '#ff6b6b',
+            border: '1px solid rgba(248, 81, 73, 0.45)',
+            fontWeight: '600'
+          };
+        };
+
+        const currentItems = historyTab === 'tasks' ? doneTasks : defects;
+
+        const filteredItems = currentItems.filter((task: any) => {
+          const term = historySearch.toLowerCase().trim();
+          if (!term) return true;
+          return task.key.toLowerCase().includes(term) || task.summary.toLowerCase().includes(term);
+        });
+
+        const totalItems = filteredItems.length;
+        const totalPages = Math.ceil(totalItems / historyItemsPerPage) || 1;
+        const currentPage = Math.min(historyPage, totalPages);
+        const startIndex = (currentPage - 1) * historyItemsPerPage;
+        const endIndex = Math.min(startIndex + historyItemsPerPage, totalItems);
+        const paginatedItems = filteredItems.slice(startIndex, endIndex);
+
+        return (
+          <main>
+            <div className="glass-panel card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 style={{ margin: 0 }}>Historial de Trabajo</h2>
+                  <p style={{ color: 'var(--text-secondary)', margin: '0.2rem 0 0 0', fontSize: '0.9rem' }}>
+                    Consulta de iniciativas finalizadas y defectos reportados a tu nombre en Jira.
+                  </p>
+                </div>
+                {/* Botón de Exportar Excel */}
+                <button
+                  onClick={historyTab === 'tasks' ? exportDoneTasksToExcel : exportDefectsToExcel}
+                  className="secondary"
+                  title={historyTab === 'tasks' ? 'Exportar iniciativas a Excel' : 'Exportar defectos a Excel'}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(33, 135, 85, 0.15)',
+                    border: '1px solid rgba(33, 135, 85, 0.4)',
+                    color: '#4caf6e',
+                    padding: '0.5rem 1.1rem',
+                    fontSize: '0.85rem',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <FileSpreadsheet size={16} />
+                  Exportar Excel
+                </button>
+              </div>
+
+              {/* Selector de Sub-pestañas Premium */}
+              <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)', width: 'fit-content', marginBottom: '1.5rem' }}>
+                <button
+                  onClick={() => { setHistoryTab('tasks'); setHistoryPage(1); setHistorySearch(""); }}
+                  className="secondary"
+                  style={{
+                    padding: '0.4rem 1rem',
+                    fontSize: '0.8rem',
+                    background: historyTab === 'tasks' ? 'var(--accent-color)' : 'transparent',
+                    color: historyTab === 'tasks' ? 'white' : 'var(--text-secondary)',
+                    border: 'none',
+                    boxShadow: historyTab === 'tasks' ? '0 2px 8px var(--accent-glow)' : 'none',
+                    transform: 'none',
+                    borderRadius: '6px'
+                  }}
+                >
+                  Iniciativas Finalizadas ({doneTasks.length})
+                </button>
+                <button
+                  onClick={() => { setHistoryTab('defects'); setHistoryPage(1); setHistorySearch(""); fetchDefects(); }}
+                  className="secondary"
+                  style={{
+                    padding: '0.4rem 1rem',
+                    fontSize: '0.8rem',
+                    background: historyTab === 'defects' ? 'var(--accent-color)' : 'transparent',
+                    color: historyTab === 'defects' ? 'white' : 'var(--text-secondary)',
+                    border: 'none',
+                    boxShadow: historyTab === 'defects' ? '0 2px 8px var(--accent-glow)' : 'none',
+                    transform: 'none',
+                    borderRadius: '6px'
+                  }}
+                >
+                  Mis Defectos / Errores ({defects.length})
+                </button>
+              </div>
+
+              {/* Controles de Filtro y Paginación Superior */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', background: 'rgba(255, 255, 255, 0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ flex: '1 1 300px', position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder={historyTab === 'tasks' ? "🔍 Buscar por clave o resumen de iniciativa..." : "🔍 Buscar por clave o resumen de error/defecto..."}
+                    value={historySearch}
+                    onChange={(e) => {
+                      setHistorySearch(e.target.value);
+                      setHistoryPage(1); // Reset a primera página al filtrar
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '0.6rem 2rem 0.6rem 1rem',
+                      color: 'white',
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                  {historySearch && (
+                    <button
+                      onClick={() => {
+                        setHistorySearch("");
+                        setHistoryPage(1);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        boxShadow: 'none'
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Por página:</span>
+                  <select
+                    value={historyItemsPerPage}
+                    onChange={(e) => {
+                      setHistoryItemsPerPage(Number(e.target.value));
+                      setHistoryPage(1); // Reset a primera página
+                    }}
+                    style={{
+                      background: 'rgba(0,0,0,0.2)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '0.5rem',
+                      color: 'white',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="issue-list">
+                {isFetchingDefects && historyTab === 'defects' ? (
+                  <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-secondary)' }}>
+                    <Loader2 size={36} className="spin" style={{ marginBottom: '1rem', color: 'var(--accent-color)' }} />
+                    <p>Cargando tus defectos desde Jira...</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
-                    <span className="badge badge-done">{task.status}</span>
+                ) : paginatedItems.length > 0 ? paginatedItems.map((task: any) => (
+                  <div key={task.key} className="issue-item">
+                    <div>
+                      <a href={`https://comunidadesb.atlassian.net/browse/${task.key}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)', fontWeight: 'bold', textDecoration: 'none' }}>
+                        {task.key}
+                      </a>
+
+                      {/* Badge de Prioridad para Errores/Defectos */}
+                      {historyTab === 'defects' && task.priority && (
+                        <span className="badge" style={{ marginLeft: '8px', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', ...getPriorityBadgeStyle(task.priority) }}>
+                          {task.priority}
+                        </span>
+                      )}
+
+                      {task.tqa && (
+                        <a href={`https://comunidadesb.atlassian.net/browse/${task.tqa}`} target="_blank" rel="noopener noreferrer" className="badge badge-done" style={{ marginLeft: '8px', background: 'var(--success-color)', color: 'white', textDecoration: 'none' }} title="Ticket TQA vinculado">
+                          {task.tqa}
+                        </a>
+                      )}
+                      {task.confluence_url && (
+                        <a href={task.confluence_url} target="_blank" rel="noopener noreferrer" className="badge" style={{ marginLeft: '8px', background: '#0052cc', color: 'white', textDecoration: 'none' }} title="Documentación en Confluence">
+                          📘 Confluence
+                        </a>
+                      )}
+                      <div style={{ marginTop: '4px', color: 'var(--text-primary)' }}>{task.summary}</div>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                        {task.created && (
+                          <span style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            📅 <strong>Asignación:</strong> {task.created}
+                          </span>
+                        )}
+                        {task.resolved && (
+                          <span style={{ background: 'rgba(63, 185, 80, 0.08)', border: '1px solid rgba(63, 185, 80, 0.25)', color: '#a5d6a7', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            ✅ <strong>Término:</strong> {task.resolved}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+                      <span className="badge" style={historyTab === 'defects' ? getStatusBadgeStyle(task.status) : (task.status?.toLowerCase().includes('done') || task.status?.toLowerCase().includes('resolved') || task.status?.toLowerCase().includes('fixed') || task.status?.toLowerCase().includes('finalizado') ? { background: 'var(--success-color)', color: 'white' } : { background: 'var(--warning-color)', color: 'white' })}>{task.status}</span>
+                    </div>
+                  </div>
+                )) : (
+                  <p style={{ color: 'var(--text-secondary)', padding: '2rem 0', textAlign: 'center' }}>
+                    No se encontraron {historyTab === 'tasks' ? 'iniciativas' : 'defectos'} {historySearch ? "que coincidan con la búsqueda." : "en el historial."}
+                  </p>
+                )}
+              </div>
+
+              {/* Footer de Paginación */}
+              {totalItems > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', flexWrap: 'wrap', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Mostrando <strong>{startIndex + 1} - {endIndex}</strong> de <strong>{totalItems}</strong> {historyTab === 'tasks' ? 'iniciativas' : 'defectos'}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <button
+                      onClick={() => setHistoryPage(1)}
+                      disabled={currentPage === 1}
+                      className="secondary"
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', minWidth: '32px' }}
+                      title="Primera página"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setHistoryPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="secondary"
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', minWidth: '32px' }}
+                    >
+                      ‹
+                    </button>
+
+                    {/* Mostrar páginas numeradas dinámicamente */}
+                    {(() => {
+                      const pages = [];
+                      const startPage = Math.max(1, currentPage - 2);
+                      const endPage = Math.min(totalPages, startPage + 4);
+                      
+                      // Corrección de inicio si estamos al final de las páginas
+                      const adjustedStartPage = Math.max(1, endPage - 4);
+                      
+                      for (let p = adjustedStartPage; p <= endPage; p++) {
+                        pages.push(
+                          <button
+                            key={p}
+                            onClick={() => setHistoryPage(p)}
+                            className={currentPage === p ? "" : "secondary"}
+                            style={{
+                              padding: '0.3rem 0.6rem',
+                              fontSize: '0.8rem',
+                              minWidth: '32px',
+                              background: currentPage === p ? 'var(--accent-color)' : 'transparent',
+                              border: currentPage === p ? 'none' : '1px solid var(--border-color)',
+                              color: currentPage === p ? 'white' : 'var(--text-primary)'
+                            }}
+                          >
+                            {p}
+                          </button>
+                        );
+                      }
+                      return pages;
+                    })()}
+
+                    <button
+                      onClick={() => setHistoryPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="secondary"
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', minWidth: '32px' }}
+                    >
+                      ›
+                    </button>
+                    <button
+                      onClick={() => setHistoryPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="secondary"
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', minWidth: '32px' }}
+                      title="Última página"
+                    >
+                      »
+                    </button>
                   </div>
                 </div>
-              )) : (
-                <p style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
-                  No se encontraron tareas recientes finalizadas.
-                </p>
               )}
             </div>
-          </div>
-        </main>
-      )}
+          </main>
+        );
+      })()}
 
       {activeTab === 'ai' && (
         <main className="grid">
@@ -958,9 +1423,132 @@ function App() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Calculadora de Tiempo de Subtareas */}
+            <div className="glass-panel card" style={{ display: 'flex', flexDirection: 'column', marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ClipboardCheck size={20} style={{ color: 'var(--accent-color)' }} />
+                  Tiempo en Subtareas
+                </h3>
+                <button 
+                  onClick={() => fetchSubtasksTime(subtasksCalculatorKey)} 
+                  disabled={isCalculatingSubtasks || !subtasksCalculatorKey} 
+                  className="secondary" 
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                  title="Actualizar datos de Jira"
+                >
+                  {isCalculatingSubtasks ? <Loader2 size={12} className="spin" /> : <RefreshCcw size={12} style={{ marginRight: '4px' }} />}
+                  Actualizar
+                </button>
+              </div>
+
+              {/* Selector de tarea si hay varias o si no se detectó */}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Seleccionar Tarea de Jira:
+                </label>
+                <select
+                  value={subtasksCalculatorKey}
+                  onChange={(e) => {
+                    setSubtasksCalculatorKey(e.target.value);
+                    fetchSubtasksTime(e.target.value);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(0,0,0,0.2)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    padding: '0.5rem',
+                    color: 'white',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">-- Seleccionar Asignación --</option>
+                  {tasks.map(t => (
+                    <option key={t.key} value={t.key}>
+                      {t.key} - {t.summary} ({t.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {subtasksTimeData ? (
+                <div>
+                  <div className="glass-panel" style={{ padding: '1rem', background: 'rgba(88, 166, 255, 0.05)', borderLeft: '4px solid var(--accent-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Estimado en Subtareas:</span>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--accent-color)', marginTop: '2px' }}>
+                        {subtasksTimeData.total_hours} hrs ({subtasksTimeData.total_days} días)
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        * Jornadas estándar de 8 horas de trabajo
+                      </div>
+                    </div>
+                    <div>
+                      <button
+                        onClick={() => {
+                          const newText = draftDaily 
+                            ? `${draftDaily}\n\n⏱️ *Tiempo total en subtareas:* ${subtasksTimeData.total_hours} horas (${subtasksTimeData.total_days} días laborables)`
+                            : `⏱️ *Tiempo total en subtareas:* ${subtasksTimeData.total_hours} horas (${subtasksTimeData.total_days} días laborables)`;
+                          setDraftDaily(newText);
+                          showNotification("¡Tiempo de subtareas anexado a la descripción del Daily!");
+                        }}
+                        className="secondary"
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}
+                      >
+                        Insertar en Daily
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sección colapsable de desglose */}
+                  <div>
+                    <button
+                      onClick={() => setIsSubtasksDesgloseOpen(!isSubtasksDesgloseOpen)}
+                      className="secondary"
+                      style={{ width: '100%', justifyContent: 'space-between', padding: '0.5rem 1rem', fontSize: '0.85rem', border: '1px solid var(--border-color)', borderRadius: '6px' }}
+                    >
+                      <span>{isSubtasksDesgloseOpen ? "▼ Ocultar Desglose de Subtareas" : "▶ Ver Desglose de Subtareas"} ({subtasksTimeData.subtasks.length})</span>
+                    </button>
+                    
+                    {isSubtasksDesgloseOpen && (
+                      <div style={{ marginTop: '0.5rem', maxHeight: '180px', overflowY: 'auto', background: 'rgba(0,0,0,0.15)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                        {subtasksTimeData.subtasks.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            {subtasksTimeData.subtasks.map(sub => (
+                              <div key={sub.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem' }}>
+                                <div style={{ minWidth: 0, flex: 1, paddingRight: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <a href={`https://comunidadesb.atlassian.net/browse/${sub.key}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-color)', fontWeight: 'bold', textDecoration: 'none', marginRight: '6px' }}>
+                                    {sub.key}
+                                  </a>
+                                  <span style={{ color: 'var(--text-primary)' }} title={sub.summary}>{sub.summary}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                                  <span className="badge" style={{ fontSize: '0.7rem', padding: '1px 5px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>{sub.status}</span>
+                                  <span style={{ fontWeight: 'bold', color: 'var(--success-color)', whiteSpace: 'nowrap' }}>{sub.original_estimate !== '0h' ? sub.original_estimate : 'Sin estimar'}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ color: 'var(--text-secondary)', padding: '1rem', fontSize: '0.85rem', textAlign: 'center' }}>Esta tarea no contiene subtareas.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', margin: '1rem 0' }}>
+                  {subtasksCalculatorKey ? "Haz clic en Actualizar para calcular las estimaciones de subtareas." : "Selecciona una tarea de Jira arriba para calcular las estimaciones."}
+                </p>
+              )}
+            </div>
+
             <div className="glass-panel card" style={{ marginBottom: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3><CheckCircle2 size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Resultado</h3>
+
                 {generatedDaily && (
                   <button onClick={copyDailyToClipboard} className="secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
                     <Copy size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Copiar

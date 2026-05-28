@@ -15,45 +15,69 @@
 ### 1. 📋 Gestión Inteligente en Jira
 * **Creación de Subtareas en 1 Clic:** Genera automáticamente el flujo estándar de 7 tareas de certificación QA para cualquier ticket.
 * **Documentación Directa:** Vinculación directa con páginas de **Confluence** desde la interfaz del listado.
-* **Historial Integrado:** Módulo para revisar tareas completadas y archivar flujos finalizados.
+* **Fecha de Asignación:** Cada tarea muestra la fecha en que fue asignada (`DD/MM/YYYY`) directamente en la tarjeta.
 
-### 2. 🧠 Copiloto AI Integrado
+### 2. ⏱️ Calculadora de Tiempo de Subtareas
+* **Suma Automática de Estimaciones:** Desde el módulo **Daily Status**, calcula el tiempo total de todas las subtareas de la iniciativa en curso sumando el campo *Estimación Original* de cada una.
+* **Desglose Detallado:** Muestra un panel expandible con el detalle de cada subtarea y su estimación individual.
+* **Formato Doble:** Presenta el total tanto en **horas** (ej. `12h 30m`) como en **días hábiles** (ej. `1.56 días`), sin necesidad de hacer cálculos manuales.
+
+### 3. 🧠 Copiloto AI Integrado
 * **Refinamiento de Historias:** Estructura historias de usuario bajo el estándar ágil óptimo.
 * **Generador de Casos de Prueba:** Diseña suites de pruebas detalladas a partir del análisis de historias de usuario.
 * **Exportación Masiva para Jira:** Permite exportar los casos de prueba generados en formato **CSV formateado y estructurado** listo para importar masivamente en Jira (Zephyr/Xray), mapeando campos clave como nombre, pasos y resultados esperados.
 * **Reporte Diario (Daily Status):** Compila reportes clasificados entre tareas completadas y planificación futura de forma profesional.
 
-### 3. ⚖️ Comparador de BD (Auditoría Contable Local)
+### 4. 📂 Historial de Trabajo
+
+#### Iniciativas Finalizadas
+* **Listado completo** de todas las tareas finalizadas traídas desde Jira.
+* **Fecha de Asignación** (`DD/MM/YYYY`) y **Fecha de Término** (fecha de resolución en Jira) visibles en cada tarjeta.
+* **Paginación Dinámica:** Selector de ítems por página (5 / 10 / 20 / 50) y paginador numérico para navegar rápidamente por el historial sin desplazamiento excesivo.
+* **Buscador en Tiempo Real:** Filtrado instantáneo por clave Jira o resumen de la iniciativa.
+* **Exportación a Excel:** Botón verde *"Exportar Excel"* que descarga un archivo `.xlsx` ordenado con columnas: Clave, Resumen, Estado, Fecha Asignación, Fecha Término, TQA Vinculado y URL Jira.
+
+#### Mis Defectos / Errores
+* **Sub-pestaña dedicada** que consulta Jira en tiempo real con la query: `project in ("Team QA") AND issuetype = Error AND assignee = <usuario>`.
+* **Badges de Prioridad** tematizados: 🔴 Alta/Crítica · 🟡 Media · 🔵 Baja.
+* **Badges de Estado** con colores semánticos:
+  * 🟢 **Verde** → Cerrado / Done / Resolved / Fixed / Finalizado
+  * 🟡 **Amarillo** → Diferido / On Hold / Postpuesto
+  * 🔴 **Rojo** → Abierto / En progreso / Activo
+* **Exportación a Excel:** Botón verde *"Exportar Excel"* que descarga un archivo `.xlsx` con columnas: Clave, Resumen, Prioridad, Estado, Fecha Creación, Fecha Cierre y URL Jira.
+* Paginación y buscador compartidos con la sub-pestaña de iniciativas.
+
+### 5. ⚖️ Comparador de BD (Auditoría Contable Local)
 * **Compatibilidad Multi-formato:** Soporta la carga cruzada de archivos `CSV`, `Excel (XLSX)` y `JSON`.
 * **Motor Contable Robusto:** Valida la regla contable central de Salcobrand: `Total Bruto - Descuentos = Pago Real`.
 * **Tolerancia de Redondeo:** Maneja diferencias de hasta `$1` para mitigar desfases menores de redondeo.
 * **Auto-Aplanado de JSON:** Capacidad inteligente para extraer datos de estructuras de JSON anidadas o complejas de forma automatizada.
 * **100% Seguro y Privado:** Procesamiento local en memoria; no requiere conexión externa a bases de datos ni guarda información confidencial fuera de tu entorno.
 
-### 4. 📂 Documentador de Evidencias de Pruebas
+### 6. 📂 Documentador de Evidencias de Pruebas
 * **Compilación de Reportes Word y HTML:** Diseña documentos de certificación formal en formatos **DOCX (Word)** y **HTML**.
 * **Generación basada en Videos y Capturas:** Procesa las grabaciones de video previas hechas durante tus ejecuciones de pruebas de QA para extraer las secuencias y armar el reporte de evidencias detalladamente.
 * **Estructura de Carpetas Automática:** Crea de forma automatizada la jerarquía de carpetas local correspondiente a la iniciativa y casos de prueba para mantener un orden riguroso.
 
-### 5. 📅 Sincronizador de Calendario & Horas
+### 7. 📅 Sincronizador de Calendario & Horas
 * **Cálculo Automático:** Extrae tus reuniones de hoy y calcula el total de horas automáticamente.
 * **Formato Humano Legible:** Convierte horas decimales (ej. `1.67h`) a formatos claros e intuitivos (ej. `1h 40m`) tanto en reportes como en listados.
 * **Envío a Jira:** Registra tus horas calculadas directamente como estimación original en tus tareas activas de Jira.
 
-### 6. 📱 Interfaz Premium y Responsiva
+### 8. 📱 Interfaz Premium y Responsiva
 * **Navegación Segmentada:** Barra superior unificada con efectos visuales *glassmorphism* y transiciones sutiles.
 * **Menú Hamburguesa Móvil:** Menú dinámico que se oculta en pantallas de escritorio y se activa con animaciones fluidas (`fadeIn`) en dispositivos móviles.
 * **Layout Fluido:** Soporte completo de auto-ajuste para pantallas intermedias (tablets y laptops pequeñas) mediante grids dinámicos.
-
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-* **Frontend:** React (TypeScript), Lucide Icons, Vanilla CSS con variables de diseño personalizadas.
+* **Frontend:** React (TypeScript), Lucide Icons, SheetJS (`xlsx`), Vanilla CSS con variables de diseño personalizadas.
 * **Backend:** FastAPI (Python), Uvicorn, OpenCV (procesamiento de video), python-docx (reportes Word).
 * **Procesamiento de Datos:** Pandas, OpenPyXL, Decimal Engine (para precisión contable absoluta).
 * **AI:** OpenAI API Integration (`gpt-4o-mini`).
+* **Integración:** Jira Cloud REST API v3 (JQL, issues, subtareas, worklogs).
 
 ---
 
@@ -129,12 +153,44 @@ cd JiraFlow
 
 ---
 
+## 📡 Endpoints del Backend (Referencia rápida)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/jira/tasks` | Tareas activas asignadas al usuario |
+| `GET` | `/jira/tasks/done` | Historial de tareas finalizadas |
+| `GET` | `/jira/defects` | Defectos/errores del usuario en Team QA |
+| `GET` | `/jira/task/{key}/subtasks-time` | Suma estimaciones de subtareas de una iniciativa |
+| `POST` | `/jira/subtasks` | Crea el flujo estándar de 7 subtareas QA |
+| `POST` | `/jira/meetings-subtask` | Registra horas de reunión en Jira |
+| `POST` | `/ai/refine` | Refina historia de usuario con AI |
+| `POST` | `/ai/test-cases` | Genera casos de prueba con AI |
+| `POST` | `/ai/daily-status` | Genera reporte daily con AI |
+| `POST` | `/evidence/generate` | Genera reporte de evidencias (DOCX/HTML) |
+| `POST` | `/evidence/create-structure` | Crea estructura de carpetas de evidencias |
+| `GET` | `/calendar/events` | Lista eventos del calendario |
+
+---
+
 ## 🛡️ Seguridad y Privacidad
 
 El módulo **Comparador de BD** ha sido diseñado bajo la filosofía **Local-First / Memory-Only**:
 * No requiere credenciales ni conexiones directas a las bases de datos de producción de la empresa.
 * Toda la comparación de datos sensibles de auditorías se procesa estrictamente en la memoria RAM del servidor local FastAPI.
 * Ningún dato contable subido es guardado en disco duro ni se comparte fuera de tu máquina de trabajo local, garantizando cumplimiento absoluto de las políticas corporativas de seguridad de la información.
+
+---
+
+## 📝 Changelog
+
+### v2.1.0 — Mayo 2026
+* ✅ **Calculadora de Tiempos:** Suma automática de estimaciones originales de subtareas con desglose en horas y días.
+* ✅ **Fechas en tarjetas:** Fecha de asignación (`created`) y fecha de término (`resolutiondate`) visibles en Asignaciones e Historial.
+* ✅ **Paginación en Historial:** Selector de ítems por página y paginador numérico dinámico.
+* ✅ **Buscador en tiempo real:** Filtrado instantáneo por clave o resumen en el módulo Historial.
+* ✅ **Módulo Mis Defectos:** Nueva sub-pestaña en Historial que consulta errores del usuario en Jira via JQL.
+* ✅ **Badges semánticos:** Colores Verde/Rojo/Amarillo para estados de defectos según su ciclo de vida.
+* ✅ **Exportación a Excel:** Descarga de iniciativas finalizadas y defectos en `.xlsx` ordenado con SheetJS.
 
 ---
 

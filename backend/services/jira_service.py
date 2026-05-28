@@ -113,12 +113,28 @@ class JiraService:
                     tqa_to_parent[tqa_key] = []
                 tqa_to_parent[tqa_key].append(idx)
 
+            created_raw = fields.get("created", "")
+            created_formatted = ""
+            if created_raw and len(created_raw) >= 10:
+                parts = created_raw[:10].split("-")
+                if len(parts) == 3:
+                    created_formatted = f"{parts[2]}/{parts[1]}/{parts[0]}"
+
+            resolved_raw = fields.get("resolutiondate", "")
+            resolved_formatted = ""
+            if resolved_raw and len(resolved_raw) >= 10:
+                parts = resolved_raw[:10].split("-")
+                if len(parts) == 3:
+                    resolved_formatted = f"{parts[2]}/{parts[1]}/{parts[0]}"
+
             tasks_list.append({
                 "key": issue["key"],
                 "summary": fields.get("summary", ""),
                 "status": fields.get("status", {}).get("name", ""),
                 "tqa": tqa_key,
                 "confluence_url": confluence_url,
+                "created": created_formatted,
+                "resolved": resolved_formatted,
             })
 
         # Búsqueda masiva (Bulk Fetch) de los links en los TQA recolectados
@@ -148,7 +164,7 @@ class JiraService:
             f'ORDER BY updated DESC'
         )
         issues = self._search_jql(jql, max_results=60,
-                                   fields=["summary","status","issuelinks","customfield_10126","issuetype"])
+                                   fields=["summary","status","issuelinks","customfield_10126","issuetype","created"])
         return self._parse_issues(issues)
 
     def get_done_tasks(self, assignee_id="712020:2c8f81bb-28b8-40a6-88fd-14186d720082"):
@@ -158,9 +174,53 @@ class JiraService:
             f'AND statusCategory = Done AND issuetype not in subtaskIssueTypes() '
             f'ORDER BY updated DESC'
         )
-        issues = self._search_jql(jql, max_results=60,
-                                   fields=["summary","status","issuelinks","customfield_10126","issuetype"])
+        issues = self._search_jql(jql, max_results=150,
+                                   fields=["summary","status","issuelinks","customfield_10126","issuetype","created","resolutiondate"])
         return self._parse_issues(issues)
+
+    def get_my_defects(self, assignee_id="712020:2c8f81bb-28b8-40a6-88fd-14186d720082"):
+        """Obtiene los defectos (errores) asignados al usuario en el proyecto Team QA."""
+        if not self.auth:
+            return []
+            
+        jql = (
+            f'project in ("Team QA") AND issuetype = Error AND assignee = "{assignee_id}" '
+            f'ORDER BY created DESC'
+        )
+        issues = self._search_jql(
+            jql, 
+            max_results=100, 
+            fields=["summary", "status", "created", "resolutiondate", "priority"]
+        )
+        
+        defects_list = []
+        for issue in issues:
+            fields = issue.get("fields", {})
+            
+            created_raw = fields.get("created", "")
+            created_formatted = ""
+            if created_raw and len(created_raw) >= 10:
+                parts = created_raw[:10].split("-")
+                if len(parts) == 3:
+                    created_formatted = f"{parts[2]}/{parts[1]}/{parts[0]}"
+
+            resolved_raw = fields.get("resolutiondate", "")
+            resolved_formatted = ""
+            if resolved_raw and len(resolved_raw) >= 10:
+                parts = resolved_raw[:10].split("-")
+                if len(parts) == 3:
+                    resolved_formatted = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                    
+            defects_list.append({
+                "key": issue["key"],
+                "summary": fields.get("summary", ""),
+                "status": fields.get("status", {}).get("name", ""),
+                "priority": fields.get("priority", {}).get("name", ""),
+                "created": created_formatted,
+                "resolved": resolved_formatted,
+            })
+            
+        return defects_list
 
     def get_issue_detail(self, issue_key):
         """Detalle completo de un issue: summary + descripción en texto plano."""
@@ -388,3 +448,67 @@ class JiraService:
             return resp.json()
         else:
             return {"error": resp.text}
+
+    def get_subtasks_time(self, parent_key):
+        """Calcula el tiempo total (estimación original) de las subtareas de una tarea principal en horas y días laborables."""
+        if not self.auth:
+            return {"error": "Jira client not initialized"}
+
+        # Buscar todas las subtareas asociadas al parent_key
+        jql = f'parent = "{parent_key}" ORDER BY created ASC'
+        issues = self._search_jql(
+            jql,
+            max_results=100,
+            fields=["summary", "status", "timetracking"]
+        )
+
+        subtasks_list = []
+        total_seconds = 0
+
+        for issue in issues:
+            fields = issue.get("fields", {})
+            timetracking = fields.get("timetracking", {})
+            
+            # El originalEstimateSeconds es provisto directamente por Jira cuando existe estimación original
+            original_estimate_seconds = timetracking.get("originalEstimateSeconds", 0)
+            original_estimate_str = timetracking.get("originalEstimate", "0h")
+            
+            total_seconds += original_estimate_seconds
+            
+            subtasks_list.append({
+                "key": issue["key"],
+                "summary": fields.get("summary", ""),
+                "status": fields.get("status", {}).get("name", ""),
+                "original_estimate": original_estimate_str,
+                "original_estimate_seconds": original_estimate_seconds
+            })
+
+        # Calcular horas totales
+        total_hours = total_seconds / 3600.0
+        
+        # Calcular días laborables basados en 8 horas de trabajo diarias
+        total_days = total_hours / 8.0
+
+        # Formatear el total acumulado en texto amigable, ej: "12h 45m"
+        total_minutes = int(round(total_seconds / 60))
+        h_desc = total_minutes // 60
+        m_desc = total_minutes % 60
+        
+        if h_desc > 0 and m_desc > 0:
+            readable_total = f"{h_desc}h {m_desc}m"
+        elif h_desc > 0:
+            readable_total = f"{h_desc}h"
+        elif m_desc > 0:
+            readable_total = f"{m_desc}m"
+        else:
+            readable_total = "0h"
+
+        return {
+            "parent_key": parent_key,
+            "total_seconds": total_seconds,
+            "total_hours": round(total_hours, 2),
+            "total_days": round(total_days, 2),
+            "readable_total": readable_total,
+            "subtasks": subtasks_list
+        }
+
