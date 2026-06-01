@@ -8,15 +8,26 @@ load_dotenv(os.path.join(base_path, ".env"))
 
 class AIService:
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY no está configurada en backend/.env")
-
-        self.client = OpenAI(api_key=api_key)
-        self.model = model
-        print(f"[AIService] Configurado para usar OpenAI ({self.model})")
+        # Preferimos OpenAI si hay clave; si no, usamos OpenRouter (API compatible).
+        if openai_key:
+            self.client = OpenAI(api_key=openai_key)
+            self.model = model
+            print(f"[AIService] Configurado para usar OpenAI ({self.model})")
+        elif openrouter_key:
+            self.client = OpenAI(
+                api_key=openrouter_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+            self.model = model
+            print(f"[AIService] Configurado para usar OpenRouter ({self.model})")
+        else:
+            raise ValueError(
+                "Configura OPENAI_API_KEY u OPENROUTER_API_KEY en backend/.env"
+            )
 
     def _generate_content(self, prompt):
         """Llamada a OpenAI API con gpt-4o-mini."""
