@@ -23,13 +23,15 @@ class JiraService:
         else:
             self.auth = None
 
-    def _search_jql(self, jql, max_results=50, fields=None):
+    def _search_jql(self, jql, max_results=50, fields=None, expand=None):
         """Ejecuta una query JQL usando POST /rest/api/3/search/jql."""
         if not self.auth:
             return []
         payload = {"jql": jql, "maxResults": max_results}
         if fields:
             payload["fields"] = fields
+        if expand:
+            payload["expand"] = expand
         resp = requests.post(
             f"{self.url}/rest/api/3/search/jql",
             headers=self.headers,
@@ -95,20 +97,26 @@ class JiraService:
         for idx, issue in enumerate(issues):
             fields = issue.get("fields", {})
             tqa_key = None
+            vqa_links = []
+            msgc_links = []
+            
             for link in fields.get("issuelinks", []):
                 inward = link.get("inwardIssue", {})
                 outward = link.get("outwardIssue", {})
-                if inward and inward.get("key", "").startswith("TQA-"):
-                    tqa_key = inward["key"]
-                    break
-                if outward and outward.get("key", "").startswith("TQA-"):
-                    tqa_key = outward["key"]
-                    break
+                k = inward.get("key") or outward.get("key")
+                if not k:
+                    continue
+                if k.startswith("TQA-"):
+                    tqa_key = k
+                elif k.startswith("VQA"):
+                    vqa_links.append(k)
+                elif k.startswith("MSGC"):
+                    msgc_links.append(k)
 
             confluence_url = self._sanitize_url(fields.get("customfield_10126"))
             
-            # Si no hay link en el padre pero hay un TQA asociado, lo anotamos para el bulk fetch
-            if not confluence_url and tqa_key:
+            # Siempre anotamos el TQA para el bulk fetch para sacar fecha CAB y links VQA/MSGC
+            if tqa_key:
                 if tqa_key not in tqa_to_parent:
                     tqa_to_parent[tqa_key] = []
                 tqa_to_parent[tqa_key].append(idx)
@@ -135,6 +143,9 @@ class JiraService:
                 "confluence_url": confluence_url,
                 "created": created_formatted,
                 "resolved": resolved_formatted,
+                "vqa_links": list(set(vqa_links)),
+                "msgc_links": list(set(msgc_links)),
+                "cab_date": None
             })
 
         # Búsqueda masiva (Bulk Fetch) de los links en los TQA recolectados
@@ -144,15 +155,49 @@ class JiraService:
             for i in range(0, len(tqa_keys), 50):
                 chunk = tqa_keys[i:i+50]
                 jql_bulk = f"key in ({','.join(chunk)})"
-                tqa_details = self._search_jql(jql_bulk, fields=["customfield_10126"], max_results=50)
+                tqa_details = self._search_jql(jql_bulk, fields=["customfield_10126", "issuelinks"], max_results=50, expand="changelog")
                 
                 for t_issue in tqa_details:
                     t_key = t_issue["key"]
-                    t_url = self._sanitize_url(t_issue.get("fields", {}).get("customfield_10126"))
-                    if t_url:
-                        # Asignar la URL a todos los padres que apuntaban a este TQA
-                        for p_idx in tqa_to_parent.get(t_key, []):
+                    t_fields = t_issue.get("fields", {})
+                    t_url = self._sanitize_url(t_fields.get("customfield_10126"))
+                    
+                    t_vqa_links = []
+                    t_msgc_links = []
+                    for link in t_fields.get("issuelinks", []):
+                        inward = link.get("inwardIssue", {})
+                        outward = link.get("outwardIssue", {})
+                        k = inward.get("key") or outward.get("key")
+                        if not k:
+                            continue
+                        if k.startswith("VQA"):
+                            t_vqa_links.append(k)
+                        elif k.startswith("MSGC"):
+                            t_msgc_links.append(k)
+                            
+                    cab_date = None
+                    for history in t_issue.get("changelog", {}).get("histories", []):
+                        for item in history.get("items", []):
+                            if item.get("field") == "status":
+                                status_str = str(item.get("toString", "")).lower()
+                                if "cab" in status_str or "cap" in status_str:
+                                    raw_date = history.get("created", "")
+                                    if raw_date and len(raw_date) >= 10:
+                                        parts = raw_date[:10].split("-")
+                                        if len(parts) == 3:
+                                            cab_date = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                                        else:
+                                            cab_date = raw_date
+                    
+                    # Asignar la URL a todos los padres que apuntaban a este TQA
+                    for p_idx in tqa_to_parent.get(t_key, []):
+                        if t_url and not tasks_list[p_idx].get("confluence_url"):
                             tasks_list[p_idx]["confluence_url"] = t_url
+                        
+                        tasks_list[p_idx]["vqa_links"] = list(set(tasks_list[p_idx]["vqa_links"] + t_vqa_links))
+                        tasks_list[p_idx]["msgc_links"] = list(set(tasks_list[p_idx]["msgc_links"] + t_msgc_links))
+                        if cab_date:
+                            tasks_list[p_idx]["cab_date"] = cab_date
 
         return tasks_list
 
@@ -367,7 +412,7 @@ class JiraService:
             "Gestionar y Validar Ambientación QA",
             "Ejecución de Pruebas y documentación de la Certificación",
             "Preparación Comité de PAP",
-            "Paso producción",
+            "Paso a producción",
         ]
 
         created = []

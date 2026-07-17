@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import {
@@ -27,6 +27,52 @@ import './index.css';
 import SalesValidator from './components/SalesValidator';
 
 const API_BASE = "http://127.0.0.1:8000";
+
+const parseCSV = (text: string): string[][] => {
+  const result: string[][] = [];
+  let row: string[] = [];
+  let val = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        val += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ';' && !inQuotes) {
+      row.push(val.trim());
+      val = '';
+    } else if (c === '\n' && !inQuotes) {
+      row.push(val.trim());
+      if (row.length > 0 && row.some(r => r !== '')) result.push(row);
+      row = [];
+      val = '';
+    } else {
+      val += c;
+    }
+  }
+  row.push(val.trim());
+  if (row.length > 0 && row.some(r => r !== '')) result.push(row);
+  return result;
+};
+
+const getTestCasesCount = (testCasesText: string): number => {
+  if (!testCasesText) return 0;
+  const csvMatch = testCasesText.match(/```(?:csv)?\s*([\s\S]*?)(?:```|$)/);
+  const csvContent = csvMatch && csvMatch[1] ? csvMatch[1].trim() : testCasesText.replace(/```csv/g, '').replace(/```/g, '').trim();
+  const parsedRows = parseCSV(csvContent);
+  const names = new Set<string>();
+  for (let i = 0; i < parsedRows.length; i++) {
+    const cols = parsedRows[i];
+    const nombre = cols[0];
+    if (!nombre || !nombre.startsWith('[') || nombre.toLowerCase().includes('nombre caso prueba')) continue;
+    names.add(nombre.trim());
+  }
+  return names.size;
+};
 
 function App() {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -251,8 +297,27 @@ function App() {
   const generateDailyStatus = async () => {
     setIsGeneratingDaily(true);
     try {
-      const res = await axios.post(`${API_BASE}/ai/daily-status`, { text: draftDaily });
+      // Separar el bloque ⏱️ (subtareas) del texto antes de enviar a la IA
+      // para que el modelo no lo elimine al clasificar.
+      const draftLines = draftDaily.split('\n');
+      const subtaskLines: string[] = [];
+      const notesLines: string[] = [];
+      for (const line of draftLines) {
+        if (line.trim().startsWith('⏱️')) {
+          subtaskLines.push(line);
+        } else {
+          notesLines.push(line);
+        }
+      }
+      const notesText = notesLines.join('\n').trim();
+
+      const res = await axios.post(`${API_BASE}/ai/daily-status`, { text: notesText || draftDaily });
       let finalStatus = res.data.daily_status;
+
+      // Re-adjuntar el bloque de subtareas verbatim al final del resultado
+      if (subtaskLines.length > 0) {
+        finalStatus += `\n\n${subtaskLines.join('\n')}`;
+      }
 
       const t = Number(metricsTotal) || 0;
       if (t > 0) {
@@ -407,9 +472,9 @@ function App() {
     if (!testCases) return;
 
     let csvContent = "";
-    const match = testCases.match(/```(?:csv)?\n([\s\S]*?)\n```/);
+    const match = testCases.match(/```(?:csv)?\s*([\s\S]*?)(?:```|$)/);
     if (match && match[1]) {
-      csvContent = match[1];
+      csvContent = match[1].trim();
     } else {
       csvContent = testCases.replace(/```csv/g, '').replace(/```/g, '').trim();
     }
@@ -419,20 +484,16 @@ function App() {
       return;
     }
 
-    // Extraer nombres (saltando la cabecera si existe)
-    const lines = csvContent.split('\n').filter(l => l.trim());
-    let startIndex = 0;
-    if (lines[0].includes('NOMBRE CASO PRUEBA')) {
-      startIndex = 1;
-    }
+    const parsedRows = parseCSV(csvContent);
 
-    const casesList = [];
-    for (let i = startIndex; i < lines.length; i++) {
-      const cols = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/(^"|"$)/g, ''));
-      if (cols.length >= 1 && cols[0]) {
-        casesList.push(cols[0]);
-      }
+    const casesSet = new Set<string>();
+    for (let i = 0; i < parsedRows.length; i++) {
+      const cols = parsedRows[i];
+      const nombre = cols[0];
+      if (!nombre || !nombre.startsWith('[') || nombre.toLowerCase().includes('nombre caso prueba')) continue;
+      casesSet.add(nombre.trim());
     }
+    const casesList = Array.from(casesSet);
 
     if (casesList.length === 0) {
       showNotification("No se detectaron nombres de casos de prueba.", 'error');
@@ -513,43 +574,154 @@ function App() {
     if (!testCases) return null;
 
     let csvContent = "";
-    const match = testCases.match(/```(?:csv)?\n([\s\S]*?)\n```/);
-    if (match && match[1]) {
-      csvContent = match[1];
+    const csvMatch = testCases.match(/```(?:csv)?\s*([\s\S]*?)(?:```|$)/);
+    if (csvMatch && csvMatch[1]) {
+      csvContent = csvMatch[1].trim();
     } else {
       csvContent = testCases.replace(/```csv/g, '').replace(/```/g, '').trim();
     }
 
-    const lines = csvContent.split('\n');
+    const parsedRows = parseCSV(csvContent);
 
     // Si no parece un CSV válido de X-ray de nuestro prompt, mostramos raw
-    if (lines.length < 2) return <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{testCases}</pre>;
+    if (parsedRows.length < 1) return <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{testCases}</pre>;
 
-    const elements = [];
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
+    const grouped: Map<string, { tipo: string; descripcion: string; steps: { step: string; accion: string; data: string; resultado: string }[] }> = new Map();
 
-      // Separador por ; pero ignorando ; dentro de comillas
-      const cols = line.split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/(^"|"$)/g, ''));
+    for (let i = 0; i < parsedRows.length; i++) {
+      const cols = parsedRows[i];
+      const nombre = cols[0];
+      if (!nombre || !nombre.startsWith('[')) continue;
 
-      if (cols.length >= 10) {
-        const stepNum = cols[5];
-        elements.push(
-          <div key={i} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '1rem', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-            <div style={{ fontWeight: 'bold', color: 'var(--accent-color)', marginBottom: '12px', fontSize: '1.05rem' }}>{cols[0]}</div>
-            <div style={{ marginBottom: '6px' }}><strong>Descripción:</strong> {cols[6]}</div>
-            <div style={{ marginBottom: '6px' }}><strong>Pasos:</strong> Paso {stepNum}: {cols[7]}</div>
-            <div style={{ marginBottom: '4px' }}><strong>Re. Esperado:</strong> {cols[9]}</div>
-          </div>
-        );
+      if (!grouped.has(nombre)) {
+        grouped.set(nombre, { tipo: cols[1] || 'Funcional', descripcion: cols[6] || '', steps: [] });
       }
+      grouped.get(nombre)!.steps.push({
+        step: cols[5] || '1',
+        accion: cols[7] || '(Caso truncado / Sin pasos)',
+        data: cols[8] || '',
+        resultado: cols[9] || ''
+      });
     }
+
+    if (grouped.size === 0) {
+      return <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{testCases}</pre>;
+    }
+
+    // Color según tipo de caso (positivo / borde / negativo)
+    const getTipoStyle = (nombre: string) => {
+      const n = nombre.toLowerCase();
+      if (n.includes('borde') || n.includes('edge')) return { badge: '#d29922', bg: 'rgba(210,153,34,0.08)', border: 'rgba(210,153,34,0.3)' };
+      if (n.includes('negativo') || n.includes('error') || n.includes('negative')) return { badge: '#ff6b6b', bg: 'rgba(248,81,73,0.08)', border: 'rgba(248,81,73,0.3)' };
+      return { badge: '#3fb950', bg: 'rgba(63,185,80,0.08)', border: 'rgba(63,185,80,0.3)' };
+    };
+
+    const elements: React.ReactElement[] = [];
+    let idx = 0;
+    grouped.forEach(({ tipo, descripcion, steps }, nombre) => {
+      const tcStyle = getTipoStyle(nombre);
+
+      // Resultado final = resultado del último paso
+      const resultadoFinal = steps.length > 0 ? steps[steps.length - 1].resultado : '';
+
+      // Texto plano copiable
+      const plainText = [
+        `NOMBRE: ${nombre}`,
+        `DESCRIPCIÓN: ${descripcion || '—'}`,
+        '',
+        'PASOS:',
+        ...steps.map(s => `  ${s.step}. ${s.accion}`),
+        '',
+        `RESULTADO ESPERADO: ${resultadoFinal}`
+      ].join('\n');
+
+      elements.push(
+        <div key={idx++} style={{
+          padding: '1.2rem 1.4rem',
+          background: tcStyle.bg,
+          border: `1px solid ${tcStyle.border}`,
+          borderRadius: '10px',
+          marginBottom: '1.1rem',
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word'
+        }}>
+
+          {/* ── Nombre + badge + botón copiar ── */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '10px' }}>
+            <div style={{ fontWeight: '700', color: 'var(--accent-color)', fontSize: '0.97rem', flex: 1, lineHeight: '1.4' }}>
+              {nombre}
+            </div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{
+                fontSize: '0.7rem', fontWeight: '600',
+                background: tcStyle.badge + '22', color: tcStyle.badge,
+                border: `1px solid ${tcStyle.badge}55`,
+                borderRadius: '4px', padding: '2px 8px'
+              }}>
+                {tipo || 'Funcional'}
+              </span>
+              <button
+                onClick={() => navigator.clipboard.writeText(plainText)}
+                title="Copiar caso al portapapeles"
+                style={{
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'var(--text-secondary)',
+                  borderRadius: '4px', padding: '2px 9px',
+                  fontSize: '0.7rem', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  whiteSpace: 'nowrap', transition: 'all 0.15s'
+                }}
+              >
+                📋 Copiar
+              </button>
+            </div>
+          </div>
+
+          {/* ── Descripción ── */}
+          {descripcion && (
+            <div style={{
+              fontSize: '0.85rem', color: 'var(--text-secondary)',
+              marginBottom: '12px', lineHeight: '1.5'
+            }}>
+              <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Descripción: </span>
+              {descripcion}
+            </div>
+          )}
+
+          {/* ── Pasos numerados ── */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+              Pasos
+            </div>
+            <div style={{ fontSize: '0.88rem', lineHeight: '1.5', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+              {steps.map(s => s.accion).join('\n')}
+            </div>
+          </div>
+
+          {/* ── Resultado Final ── */}
+          {resultadoFinal && (
+            <div style={{
+              marginTop: '4px',
+              padding: '8px 12px',
+              background: tcStyle.badge + '18',
+              borderLeft: `3px solid ${tcStyle.badge}`,
+              borderRadius: '0 6px 6px 0',
+              fontSize: '0.85rem', lineHeight: '1.5'
+            }}>
+              <span style={{ fontWeight: '600', color: tcStyle.badge }}>✔ Resultado esperado: </span>
+              <span style={{ color: 'var(--text-primary)' }}>{resultadoFinal}</span>
+            </div>
+          )}
+        </div>
+      );
+    });
 
     return elements.length > 0 ? (
       <div>
-        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', fontStyle: 'italic' }}>
-          Vista de lectura rápida. Selecciona el texto para copiarlo a Jira manualmente o usa el botón superior para descargar el archivo de carga masiva X-ray.
+        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          <strong>{grouped.size} caso{grouped.size !== 1 ? 's' : ''} de prueba</strong> generados.{' '}
+          Usa <strong>📋 Copiar</strong> para pegar en Jira/Confluence · Botón <strong>Exportar CSV</strong> para importar a X-ray.
         </div>
         {elements}
       </div>
@@ -624,53 +796,53 @@ function App() {
             <div className="slogan">QA Assistant</div>
           </div>
         </div>
-        
-        <button 
-          className="mobile-menu-btn" 
+
+        <button
+          className="mobile-menu-btn"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
 
         <nav className={`nav-container ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-          <button 
-            className={`nav-button ${activeTab === 'jira' ? 'active' : ''}`} 
+          <button
+            className={`nav-button ${activeTab === 'jira' ? 'active' : ''}`}
             onClick={() => { setActiveTab('jira'); setIsMobileMenuOpen(false); }}
           >
             <LayoutDashboard size={16} /> Asignaciones
           </button>
-          <button 
-            className={`nav-button ${activeTab === 'ai' ? 'active' : ''}`} 
+          <button
+            className={`nav-button ${activeTab === 'ai' ? 'active' : ''}`}
             onClick={() => { setActiveTab('ai'); setIsMobileMenuOpen(false); }}
           >
             <BrainCircuit size={16} /> Refinador AI
           </button>
-          <button 
-            className={`nav-button ${activeTab === 'archive' ? 'active' : ''}`} 
+          <button
+            className={`nav-button ${activeTab === 'archive' ? 'active' : ''}`}
             onClick={() => { setActiveTab('archive'); setIsMobileMenuOpen(false); }}
           >
             <Archive size={16} /> Historial
           </button>
-          <button 
-            className={`nav-button ${activeTab === 'calendar' ? 'active' : ''}`} 
+          <button
+            className={`nav-button ${activeTab === 'calendar' ? 'active' : ''}`}
             onClick={() => { setActiveTab('calendar'); setIsMobileMenuOpen(false); }}
           >
             <Calendar size={16} /> Calendario
           </button>
-          <button 
-            className={`nav-button ${activeTab === 'daily' ? 'active' : ''}`} 
+          <button
+            className={`nav-button ${activeTab === 'daily' ? 'active' : ''}`}
             onClick={() => { setActiveTab('daily'); setIsMobileMenuOpen(false); }}
           >
             <MessageSquare size={16} /> Daily Status
           </button>
-          <button 
-            className={`nav-button ${activeTab === 'evidence' ? 'active' : ''}`} 
+          <button
+            className={`nav-button ${activeTab === 'evidence' ? 'active' : ''}`}
             onClick={() => { setActiveTab('evidence'); setIsMobileMenuOpen(false); }}
           >
             <FileText size={16} /> Documentación
           </button>
-          <button 
-            className={`nav-button ${activeTab === 'validator' ? 'active' : ''}`} 
+          <button
+            className={`nav-button ${activeTab === 'validator' ? 'active' : ''}`}
             onClick={() => { setActiveTab('validator'); setIsMobileMenuOpen(false); }}
           >
             <ShieldCheck size={16} /> Comparador de BD
@@ -1000,6 +1172,21 @@ function App() {
                             ✅ <strong>Término:</strong> {task.resolved}
                           </span>
                         )}
+                        {task.cab_date && (
+                          <span style={{ background: 'rgba(156, 39, 176, 0.1)', border: '1px solid rgba(156, 39, 176, 0.3)', color: '#ce93d8', padding: '2px 8px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }} title="Fecha en que la iniciativa fue aprobada por CAP/CAB">
+                            🚀 <strong>CAB:</strong> {task.cab_date}
+                          </span>
+                        )}
+                        {task.vqa_links && task.vqa_links.length > 0 && task.vqa_links.map((vqa: string) => (
+                          <a key={vqa} href={`https://comunidadesb.atlassian.net/browse/${vqa}`} target="_blank" rel="noopener noreferrer" className="badge" style={{ background: 'rgba(233, 30, 99, 0.15)', color: '#f48fb1', border: '1px solid rgba(233, 30, 99, 0.3)', textDecoration: 'none', padding: '2px 8px', borderRadius: '4px' }} title="Tarjeta VQA">
+                            🛡️ {vqa}
+                          </a>
+                        ))}
+                        {task.msgc_links && task.msgc_links.length > 0 && task.msgc_links.map((msgc: string) => (
+                          <a key={msgc} href={`https://comunidadesb.atlassian.net/browse/${msgc}`} target="_blank" rel="noopener noreferrer" className="badge" style={{ background: 'rgba(255, 152, 0, 0.15)', color: '#ffcc80', border: '1px solid rgba(255, 152, 0, 0.3)', textDecoration: 'none', padding: '2px 8px', borderRadius: '4px' }} title="Tarjeta MSGC">
+                            📦 {msgc}
+                          </a>
+                        ))}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
@@ -1044,10 +1231,10 @@ function App() {
                       const pages = [];
                       const startPage = Math.max(1, currentPage - 2);
                       const endPage = Math.min(totalPages, startPage + 4);
-                      
+
                       // Corrección de inicio si estamos al final de las páginas
                       const adjustedStartPage = Math.max(1, endPage - 4);
-                      
+
                       for (let p = adjustedStartPage; p <= endPage; p++) {
                         pages.push(
                           <button
@@ -1136,12 +1323,9 @@ function App() {
                 {testCases && (
                   <span className="badge" style={{ background: 'rgba(88, 166, 255, 0.15)', color: 'var(--accent-color)', padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid rgba(88, 166, 255, 0.3)' }}>
                     {(() => {
-                      const match = testCases.match(/```(?:csv)?\n([\s\S]*?)\n```/);
-                      const csv = match ? match[1] : testCases.replace(/```csv/g, '').replace(/```/g, '').trim();
-                      const count = csv.split('\n').filter(line => line.trim() && line.split(';').length >= 10).length;
-                      const hasHeader = csv.includes('NOMBRE CASO PRUEBA');
-                      return hasHeader ? count - 1 : count;
-                    })()} totales
+                      const count = getTestCasesCount(testCases);
+                      return `${count} caso${count !== 1 ? 's' : ''}`;
+                    })()}
                   </span>
                 )}
               </div>
@@ -1430,10 +1614,10 @@ function App() {
                   <ClipboardCheck size={20} style={{ color: 'var(--accent-color)' }} />
                   Tiempo en Subtareas
                 </h3>
-                <button 
-                  onClick={() => fetchSubtasksTime(subtasksCalculatorKey)} 
-                  disabled={isCalculatingSubtasks || !subtasksCalculatorKey} 
-                  className="secondary" 
+                <button
+                  onClick={() => fetchSubtasksTime(subtasksCalculatorKey)}
+                  disabled={isCalculatingSubtasks || !subtasksCalculatorKey}
+                  className="secondary"
                   style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
                   title="Actualizar datos de Jira"
                 >
@@ -1488,7 +1672,7 @@ function App() {
                     <div>
                       <button
                         onClick={() => {
-                          const newText = draftDaily 
+                          const newText = draftDaily
                             ? `${draftDaily}\n\n⏱️ *Tiempo total en subtareas:* ${subtasksTimeData.total_hours} horas (${subtasksTimeData.total_days} días laborables)`
                             : `⏱️ *Tiempo total en subtareas:* ${subtasksTimeData.total_hours} horas (${subtasksTimeData.total_days} días laborables)`;
                           setDraftDaily(newText);
@@ -1511,7 +1695,7 @@ function App() {
                     >
                       <span>{isSubtasksDesgloseOpen ? "▼ Ocultar Desglose de Subtareas" : "▶ Ver Desglose de Subtareas"} ({subtasksTimeData.subtasks.length})</span>
                     </button>
-                    
+
                     {isSubtasksDesgloseOpen && (
                       <div style={{ marginTop: '0.5rem', maxHeight: '180px', overflowY: 'auto', background: 'rgba(0,0,0,0.15)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                         {subtasksTimeData.subtasks.length > 0 ? (
@@ -1557,8 +1741,46 @@ function App() {
               </div>
 
               {generatedDaily ? (
-                <div className="result-box" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', padding: '1rem', background: 'rgba(0,0,0,0.2)' }}>
-                  {generatedDaily}
+                <div className="result-box" style={{ fontFamily: 'inherit', padding: '1rem', background: 'rgba(0,0,0,0.2)', lineHeight: '1.7', fontSize: '0.93rem' }}>
+                  {generatedDaily.split('\n').map((line, idx) => {
+                    // Líneas de sección (¿Qué hice hoy?, etc.)
+                    const isSectionHeader = /^\s*[¿?]?(Qué hice hoy|Qué har[eé] mañana|Tengo impedimentos)/i.test(line);
+                    // Líneas de reporte (📊, ✅, 🎯, 🐞)
+                    const isReportHeader = /^[📊✅🎯🐞]/.test(line.trim());
+                    // Renderizar *bold* → <strong>
+                    const renderBold = (text: string) => {
+                      const parts = text.split(/(\*[^*]+\*)/g);
+                      return parts.map((p, i) =>
+                        p.startsWith('*') && p.endsWith('*')
+                          ? <strong key={i} style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{p.slice(1, -1)}</strong>
+                          : <span key={i}>{p}</span>
+                      );
+                    };
+                    if (isSectionHeader) {
+                      return (
+                        <div key={idx} style={{
+                          fontWeight: '700',
+                          color: 'var(--accent-color)',
+                          fontSize: '0.97rem',
+                          marginTop: idx === 0 ? 0 : '1.1rem',
+                          marginBottom: '0.3rem',
+                          borderBottom: '1px solid rgba(88,166,255,0.2)',
+                          paddingBottom: '3px'
+                        }}>
+                          {line}
+                        </div>
+                      );
+                    }
+                    if (isReportHeader) {
+                      return (
+                        <div key={idx} style={{ fontWeight: '600', marginTop: '0.8rem', marginBottom: '0.2rem' }}>
+                          {renderBold(line)}
+                        </div>
+                      );
+                    }
+                    if (line.trim() === '') return <div key={idx} style={{ height: '0.3rem' }} />;
+                    return <div key={idx}>{renderBold(line)}</div>;
+                  })}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', marginTop: '4rem', color: 'var(--text-secondary)' }}>

@@ -29,19 +29,20 @@ class AIService:
                 "Configura OPENAI_API_KEY u OPENROUTER_API_KEY en backend/.env"
             )
 
-    def _generate_content(self, prompt):
-        """Llamada a OpenAI API con gpt-4o-mini."""
+    def _generate_content(self, prompt, system_prompt=None):
+        """Llamada a OpenAI API / OpenRouter."""
         try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            
+            messages.append({"role": "user", "content": prompt})
+
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
+                messages=messages,
                 temperature=0.7,
-                max_completion_tokens=2000,
+                max_completion_tokens=6000,
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -65,10 +66,11 @@ class AIService:
         
         (IMPORTANTE: Cada cláusula DEBE ir en una línea distinta).
 
-        ### ✅ Criterios de Aceptación
+        ### ✅ Criterios de Aceptación y Reglas de Negocio
         - [Criterio 1]
         - [Criterio 2]
         ...
+        (REGLA CRÍTICA: NO ELIMINES, NO RESUMAS y NO OMITAS los Criterios de Aceptación, Reglas de Negocio o Escenarios que vengan en el borrador original. Si el usuario te pasa 8 criterios y 3 escenarios, DEBES incluirlos todos en esta sección mejorando su redacción, pero NUNCA reduciendo la cantidad de validaciones).
 
         ### 🔍 Ambigüedades y Notas
         - [Punto 1]
@@ -80,88 +82,74 @@ class AIService:
 
     def generate_test_cases(self, refined_story):
         """Genera casos de prueba basados en una historia refinada."""
-        prompt = f"""
-        Actúa como un Senior QA Automation Engineer especializado en eCommerce SB.
-        Tu objetivo es generar CASOS DE PRUEBA FUNCIONALES DE ALTA CALIDAD, claros, ordenados y listos para ser importados en Xray (nuevo formato).
+        system_prompt = """
+        Actúa como un Asistente Automatizado experto en QA. 
+        Este es un ejercicio de transformación de texto y simulación estricta basado ÚNICAMENTE en la historia proporcionada. No necesitas ejecutar pruebas en sistemas reales ni preocuparte por la plataforma subyacente.
+        Tu objetivo es convertir la historia en un bloque de código CSV con CASOS DE PRUEBA FUNCIONALES formateados para Xray.
 
-
-        Historia: {refined_story}
-
-        REGLAS ESTRICTAS PARA LOS CASOS DE PRUEBA (Diseñados para importación a X-ray con nuevo formato):
+        REGLAS ESTRICTAS PARA LOS CASOS DE PRUEBA:
 
         1. El "NOMBRE CASO PRUEBA" de CADA caso de prueba DEBE comenzar OBLIGATORIAMENTE con el prefijo "[Ecommerce_SB] ".
-        2. Genera los casos de prueba siguiendo estrictamente el ORDEN LÓGICO Y CRONOLÓGICO de las tareas, desarrollos y criterios de aceptación descritos en la historia (muy importante para releases con múltiples desarrollos).
+        2. OBLIGACIÓN DE VOLUMEN (CRÍTICO): ESTÁ ESTRICTAMENTE PROHIBIDO generar solo un caso por cada "Escenario Funcional" y omitir los "Criterios de Aceptación (CA)". DEBES generar UN CASO DE PRUEBA INDEPENDIENTE POR CADA CRITERIO DE ACEPTACIÓN (CA-XX) Y POR CADA REGLA DE NEGOCIO (RN-XX) que requiera validación en la interfaz. Si la historia tiene 8 Criterios de Aceptación, el resultado MÍNIMO OBLIGATORIO son 8 Casos de Prueba distintos. A eso se le suman los Escenarios Funcionales.
         3. Incluye Caminos felices (Positive paths), Casos de borde (Edge cases) y Escenarios de error (Negative tests).
         4. Fija "TIPO TC" a "Funcional".
         5. Fija "SISTEMA AFECTADO" a "eCommerce SB".
         6. Fija "CREADO POR" y "PERSONA ASIGNADA" a "Ricardo Alberto Benavides Rozas".
         7. TODOS los casos de prueba deben seguir ESTRICTAMENTE el orden lógico y cronológico del flujo funcional descrito en la historia y sus criterios de aceptación.
-        8. Un caso de prueba debe validar un FLUJO FUNCIONAL COMPLETO, NO un paso individual. Acciones como "Acceder", "Editar", "Guardar" y "Verificar" deben ser pasos (STEPS) dentro del MISMO test, no tests independientes.
-        9. Escenarios distintos (ej: Usuario Registrado vs Usuario Invitado, o Caso Positivo vs Error de Datos) SÍ deben ser casos de prueba independientes.
-        10. Incluye cobertura completa de: Caminos felices (Positive), Casos de borde (Edge), Escenarios negativos / de error (Negative).
+        8. Un caso de prueba debe validar un FLUJO FUNCIONAL COMPLETO. Escenarios distintos (ej: Visualización exitosa, Error al cargar, Búsqueda de usuario, Cambio de información en card) DEBEN ser casos de prueba independientes con NOMBRES DIFERENTES.
+        9. NOMBRES ÚNICOS (CRÍTICO): PROHIBIDO repetir el "NOMBRE CASO PRUEBA" para flujos o escenarios distintos. CADA caso de prueba debe tener un nombre único que describa exactamente la variación que está probando (ej: "[Ecommerce_SB] Validar CA-01: Visualizar botón Contratos", "[Ecommerce_SB] Validar CA-02: Desplegar listado", "[Ecommerce_SB] Buscar usuario por RUT").
+        10. EXHAUSTIVIDAD Y MAPEADO (CRÍTICO): Eres un QA Senior. NO RESUMAS. Debes leer TODOS los CA-XX y RN-XX. Transforma CADA UNO de ellos en un caso de prueba independiente con sus respectivos pasos. Generar 3 casos de prueba para una historia con 8 criterios es un error grave. Mapea 1 a 1.
         11. No inventes funcionalidades que no estén explícita o implícitamente descritas en la historia.
         12. Utiliza redacción profesional, clara, específica y sin ambigüedades.
 
         ════════════════════════════════════
         📌 REGLA QA PARA EVITAR DUPLICADOS (Tip SB)
         ════════════════════════════════════
-        Un caso de prueba debe validar un objetivo o flujo completo. 
-        NO separes los pasos de una misma intención funcional en pruebas distintas.
-        Ejemplo: Iniciar sesión, Acceder al perfil, Editar dirección y Guardar cambios corresponden a UN SOLO caso de prueba "[Ecommerce_SB] Editar dirección correctamente".
+        Dentro de un mismo caso de prueba, separa las acciones en pasos numerados (STEPS). Pero NO juntes intenciones distintas (ej. Camino Feliz vs Camino de Error) en el mismo test. Deben ser test cases separados.
 
         ════════════════════════════════════
-        🔎 REGLAS AVANZADAS PARA EL PASO A PASO (OBLIGATORIAS)
+        🔎 NUEVA REGLA DE FORMATO: 1 CASO = 1 FILA
         ════════════════════════════════════
-        Las columnas STEP y ACCION son CRÍTICAS y deben cumplir estrictamente lo siguiente:
+        ATENCIÓN: Debes incluir TODOS los pasos de un caso de prueba DENTRO DE UNA ÚNICA CELDA (en la columna ACCION), separados por saltos de línea numéricos. 
+        ESTO SIGNIFICA QUE SI GENERAS 8 CASOS DE PRUEBA, EL CSV DEBE TENER EXACTAMENTE 8 FILAS DE DATOS.
+
+        Las columnas deben cumplir estrictamente lo siguiente:
         
         1. STEP:
-           - Debe ser numérico, secuencial y comenzar en 1 para cada caso de prueba.
-           - Cada STEP representa UNA acción única y atómica.
+           - Como todo el caso va en una sola fila, deja esta columna siempre con el valor "1".
 
-        2. ACCION:
-           - Debe describir acciones reales y ejecutables, no conceptos genéricos.
-           - Cada acción debe comenzar con un verbo en infinitivo (Ej: "Abrir", "Ingresar", "Seleccionar", "Validar", "Confirmar").
-           - NO usar frases vagas como:
-           "Realizar el proceso", "Completar flujo", "Ejecutar acción", "Validar comportamiento".
-           - Debe indicar explícitamente:
-           - Dónde actúa el usuario (pantalla, sección, módulo)
-              - Qué elemento interactúa (botón, campo, selector, link)
-           - Qué acción realiza
+        2. ACCION (MUY IMPORTANTE):
+           - Debe contener TODOS los pasos del flujo, numerados y separados por saltos de línea reales.
+           - PROHIBIDO RESUMIR EL CASO EN UN SOLO PASO. Cada caso de prueba DEBE tener una secuencia lógica y detallada de al menos 3 a 5 pasos de navegación (ej: "1. Acceder a la plataforma\n2. Navegar a la sección X\n3. Ingresar datos Y\n4. Hacer clic en Z\n5. Validar resultado"). Escribir un solo paso genérico como "1. Validar funcionalidad" es un error crítico.
+           - Para asegurar que los saltos de línea no rompan el CSV, el valor de la columna DEBE ir entre comillas dobles. Ej: 
+           "1. Abrir la página
+           2. Clic en login"
+           - Cada acción debe comenzar con un verbo en infinitivo.
 
-        3. Descomposición obligatoria de PASOS:
-           - No combines múltiples acciones en un solo paso del CSV.
-           - Si una acción requiere datos, la acción debe indicarlo claramente.
-           - Navegación, ingreso de datos, confirmaciones y validaciones deben ir en pasos (STEPS) separados, pero SIEMPRE bajo el mismo nombre de caso de prueba si pertenecen al mismo flujo.
+        3. DATA y RESULTADO ESPERADO:
+           - Puedes listar los datos y resultados esperados usando saltos de línea si corresponden a cada paso, o escribir un resultado global. También entre comillas dobles.
 
-        4. Contexto eCommerce SB:
-           - Usa términos reales del dominio eCommerce (ej: carrito, checkout, medio de pago, despacho, resumen de compra).
-           - Asume flujos web reales (no acciones abstractas).
+        Formatea el resultado ÚNICAMENTE como datos en formato CSV encerrados en UN ÚNICO bloque de código ```csv ... ```. 
+        ESTÁ ESTRICTAMENTE PROHIBIDO generar múltiples bloques de código CSV o separar los casos con texto intermedio. TODOS los casos de prueba deben ir dentro del mismo y único bloque CSV.
+        Usa EXACTAMENTE el carácter ";" (punto y coma) como separador de columnas. OBLIGATORIO: Encierra los valores que contienen saltos de línea con comillas dobles para que el CSV sea válido.
 
-        Ejemplo INCORRECTO:
-        "ACCION": "Completar proceso de compra"
-
-        Ejemplo CORRECTO (Dentro de un mismo Caso de Prueba):
-        "STEP";"ACCION"
-        "1";"Acceder al carrito de compras"
-        "2";"Presionar botón 'Ir a pagar'"
-        "3";"Seleccionar dirección de despacho"
-        "4";"Seleccionar medio de pago válido"
-        "5";"Confirmar la orden de compra"
-
-        Formatea el resultado ÚNICAMENTE como datos en formato CSV encerrados en un bloque de código ```csv ... ```.
-        Usa EXACTAMENTE el carácter ";" (punto y coma) como separador de columnas. Encierra los valores relevantes entre comillas dobles si contienen comas o saltos de línea.
-        Las cabeceras deben ser EXACTAMENTE:
-        NOMBRE CASO PRUEBA;TIPO TC;SISTEMA AFECTADO;CREADO POR;PERSONA ASIGNADA;STEP;DESCRIPCION;ACCION;DATA;RESULTADO ESPERADO
-
-        Ejemplo:
+        Ejemplo EXACTO de la estructura esperada:
         ```csv
         NOMBRE CASO PRUEBA;TIPO TC;SISTEMA AFECTADO;CREADO POR;PERSONA ASIGNADA;STEP;DESCRIPCION;ACCION;DATA;RESULTADO ESPERADO
-        "[Ecommerce_SB] Login exitoso";"Funcional";"eCommerce SB";"Ricardo Alberto Benavides Rozas";"Ricardo Alberto Benavides Rozas";"1";"Validar inicio de sesión";"Abrir web e ingresar RUT";"RUT válido";"Acceso exitoso al home"
-        "[Ecommerce_SB] Login exitoso";"Funcional";"eCommerce SB";"Ricardo Alberto Benavides Rozas";"Ricardo Alberto Benavides Rozas";"2";"Validar inicio de sesión";"Ingresar contraseña y presionar entrar";"Password válida";"Sesión iniciada correctamente"
+        "[Ecommerce_SB] Login exitoso";"Funcional";"eCommerce SB";"Ricardo Alberto Benavides Rozas";"Ricardo Alberto Benavides Rozas";"1";"Validar inicio de sesión";"1. Abrir web e ingresar RUT
+        2. Ingresar contraseña y presionar entrar";"RUT válido
+        Password válida";"Sesión iniciada correctamente"
+        "[Ecommerce_SB] Login fallido";"Funcional";"eCommerce SB";"Ricardo Alberto Benavides Rozas";"Ricardo Alberto Benavides Rozas";"1";"Validar error de contraseña";"1. Abrir web e ingresar RUT
+        2. Ingresar contraseña incorrecta";"RUT válido
+        Password inválida";"Mensaje de error"
         ```
 
+        COMIENZA TU RESPUESTA DIRECTAMENTE CON EL BLOQUE ```csv. ESTÁ PROHIBIDO INCLUIR SALUDOS, PREÁMBULOS O EXPLICACIONES. No te disculpes ni te niegues, esto es solo formateo de texto simulado.
         """
-        return self._generate_content(prompt)
+
+        user_prompt = f"Historia de Usuario y Criterios:\n{refined_story}\n\nPor favor, genera el bloque de código CSV con todos los casos de prueba mapeados. EMPIEZA DIRECTAMENTE CON ```csv. NO digas 'Aquí tienes' ni repitas las reglas."
+        
+        return self._generate_content(user_prompt, system_prompt=system_prompt)
 
     def generate_daily_status(self, notes):
         """Genera un reporte diario basado en notas sueltas, actuando como un organizador lógico estricto."""
